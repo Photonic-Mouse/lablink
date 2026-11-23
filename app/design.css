@@ -877,12 +877,64 @@ footer small {
   inset: 0;
   background: #e9e9e2;
   z-index: 50;
-  padding: 12vh 12%;
+  padding: 10vh 12%;
   display: none;
+  overflow-y: auto;
 }
 
 .search-overlay.open {
   display: block;
+}
+
+.search-results {
+  margin-top: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 52vh;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.search-result-item {
+  padding: 14px 18px;
+  background: white;
+  border: 1px solid var(--line);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all .2s;
+}
+
+.search-result-item:hover {
+  border-color: var(--ink);
+  transform: translateX(4px);
+}
+
+.search-result-item h4 {
+  margin: 0;
+  font-size: 15px;
+  letter-spacing: -.03em;
+  color: var(--ink);
+}
+
+.search-match-reason {
+  font: 10px 'DM Mono', monospace;
+  color: #555;
+  margin-top: 5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.search-match-reason span.badge {
+  background: var(--lime);
+  color: #111;
+  padding: 1px 6px;
+  font-weight: bold;
+  font-size: 8px;
 }
 
 .search-overlay .close {

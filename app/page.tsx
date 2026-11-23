@@ -11,7 +11,7 @@ import {
   Weights,
 } from "@/lib/seed";
 import { db } from "@/lib/db";
-import { hasRequiredTraining } from "@/lib/training";
+import { hasRequiredTraining, getRequiredTrainingModule } from "@/lib/training";
 import {
   notifyBookingSubmitted,
   notifyBookingApproved,
@@ -96,6 +96,50 @@ export default function Home() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [shownLimit, setShownLimit] = useState(equipment.length);
 
+  // Natural Language Search API state
+  const [searchResults, setSearchResults] = useState<
+    Array<{ equipment: Equipment; score: number; matchReason: string }>
+  >([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  // Active student session (Maya Lin, Computer Science Senior)
+  const currentStudent = db.students[0] || {
+    id: "stu-001",
+    name: "Maya Lin",
+    dept: "Computer Science",
+    year: 4,
+    certs: ["oscilloscope-basics", "3d-printer-safety"],
+    usageHoursLast30d: 6,
+    noShows: 0,
+  };
+
+  // Live call to /api/search for natural language queries
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults(data.results || []);
+        }
+      } catch (err) {
+        console.error("Search API error:", err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   // Faculty Queue state
   const [bookings, setBookings] = useState<BookingRequest[]>(initialBookings);
   const [weights, setWeights] = useState<Weights>(defaultWeights);
@@ -122,7 +166,7 @@ export default function Home() {
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 2500);
+    setTimeout(() => setToastMessage(null), 3000);
   };
 
   const toggleSave = (id: string, e?: React.MouseEvent) => {
@@ -172,42 +216,60 @@ export default function Home() {
 
   const displayedEquipment = filteredEquipment.slice(0, shownLimit);
 
-  // Handle Booking Submission with automated multi-factor scoring
+  // Handle Booking Submission with safety validation and automated multi-factor scoring
   const handleBookingSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProduct) return;
 
-    const student = db.students[0] || {
-      id: "stu-001",
-      name: "Student Researcher",
-      dept: "Computer Science",
-      year: 4,
-      certs: ["oscilloscope-basics", "3d-printer-safety"],
-      usageHoursLast30d: 6,
-      noShows: 0,
-    };
-
-    const hasCert = hasRequiredTraining(student, selectedProduct);
-    if (!hasCert && selectedProduct.trainingRequired) {
-      showToast(`TRAINING REQUIRED: ${selectedProduct.trainingRequired.toUpperCase()}`);
+    // Check maintenance status
+    if (selectedProduct.status === "maintenance") {
+      showToast(`BOOKING BLOCKED: ${selectedProduct.name} is currently under maintenance.`);
+      return;
     }
 
+    // Check training safety certification
+    const isCertified = hasRequiredTraining(currentStudent, selectedProduct);
+    if (!isCertified && selectedProduct.trainingRequired) {
+      const mod = getRequiredTrainingModule(selectedProduct);
+      showToast(
+        `BOOKING BLOCKED: Missing certification "${mod?.name || selectedProduct.trainingRequired}". Complete prerequisite training before reserving.`
+      );
+      return;
+    }
+
+    // Dynamic Multi-Factor Scoring Engine
+    const deadlineUrgency =
+      projectClassification === "thesis" ? 95 :
+      projectClassification === "research" ? 88 :
+      projectClassification === "course" ? 82 : 70;
+
+    const grantRelevance =
+      projectClassification === "research" ? 95 :
+      projectClassification === "thesis" ? 92 :
+      projectTitle.length > 10 ? 85 : 78;
+
+    const fairnessScore = Math.max(50, 100 - (currentStudent.usageHoursLast30d || 6) * 3);
+
+    const academicStanding =
+      projectClassification === "thesis" ? 96 :
+      currentStudent.year >= 4 ? 90 : 82;
+
     const factors = {
-      deadline: projectClassification === "thesis" ? 95 : 80,
-      relevance: projectTitle.length > 10 ? 92 : 82,
-      fairness: 86,
-      academic: projectClassification === "thesis" ? 96 : 84,
-      waiting: 80,
+      deadline: deadlineUrgency,
+      relevance: grantRelevance,
+      fairness: fairnessScore,
+      academic: academicStanding,
+      waiting: 85,
     };
 
     const score = calculateScore(factors, weights);
 
     const newBooking: BookingRequest = {
       id: `req-${Date.now().toString().slice(-4)}`,
-      studentId: student.id,
-      studentName: student.name,
-      studentDept: student.dept,
-      studentYear: student.year,
+      studentId: currentStudent.id,
+      studentName: currentStudent.name,
+      studentDept: currentStudent.dept,
+      studentYear: currentStudent.year,
       equipmentIds: [selectedProduct.id],
       equipmentNames: [selectedProduct.name],
       slotStart: `${preferredDate} ${preferredSlot.split(" – ")[0]}`,
@@ -220,7 +282,7 @@ export default function Home() {
       status: "pending",
       score,
       factors,
-      explanation: `Automated assessment: ${projectClassification.toUpperCase()} project. Score: ${score}/100. Submitted for faculty queue review.`,
+      explanation: `Automated assessment: ${projectClassification.toUpperCase()} proposal. Priority score: ${score}/100. Pending faculty review.`,
     };
 
     db.bookings.unshift(newBooking);
@@ -230,7 +292,7 @@ export default function Home() {
     setSelectedProduct(null);
     setProjectTitle("");
     setProjectReason("");
-    showToast(`REQUEST SUBMITTED · PRIORITY SCORE: ${score}/100`);
+    showToast(`REQUEST SUBMITTED · PRIORITY SCORE: ${score}/100 · ADDED TO FACULTY QUEUE`);
   };
 
   // Faculty Queue Actions
@@ -728,7 +790,11 @@ export default function Home() {
       <div className={`search-overlay ${isSearchOpen ? "open" : ""}`}>
         <button
           className="close"
-          onClick={() => setIsSearchOpen(false)}
+          onClick={() => {
+            setIsSearchOpen(false);
+            setSearchQuery("");
+            setSearchResults([]);
+          }}
         >
           ×
         </button>
@@ -736,14 +802,51 @@ export default function Home() {
           <b /> FIND YOUR NEXT TOOL
         </div>
         <input
-          placeholder="Try ‘oscilloscope’, ‘biotech’, or ‘4090’..."
+          placeholder="Try ‘oscilloscope’, ‘biotech’, or ‘3d printing for drone’..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           autoFocus={isSearchOpen}
         />
         <p>
-          SEARCH {equipment.length} INSTRUMENTS ACROSS 5 DEPARTMENTS ({filteredEquipment.length} MATCHES)
+          {isSearching
+            ? "AI MATCHING INSTRUMENTS ACROSS 5 DEPARTMENTS..."
+            : searchResults.length > 0
+            ? `AI SEARCH: ${searchResults.length} INSTRUMENTS MATCHED WITH EXPLANATIONS`
+            : `SEARCH ${equipment.length} INSTRUMENTS ACROSS 5 DEPARTMENTS`}
         </p>
+
+        {/* Live Natural Language Results with Match Reasons */}
+        {searchResults.length > 0 && (
+          <div className="search-results">
+            {searchResults.map(({ equipment: item, matchReason, score }) => (
+              <div
+                key={item.id}
+                className="search-result-item"
+                onClick={() => {
+                  setSelectedProduct(item);
+                  setIsSearchOpen(false);
+                }}
+              >
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ fontSize: "18px" }}>{item.imageEmoji}</span>
+                    <h4>{item.name}</h4>
+                    <span className="availability" style={{ fontSize: "8px", marginLeft: "6px" }}>
+                      {item.status.toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="search-match-reason">
+                    <span className="badge">AI MATCH {score}</span>
+                    <span>{matchReason}</span>
+                  </div>
+                </div>
+                <span style={{ font: "9px 'DM Mono'", color: "#111", borderBottom: "1px solid #111", whiteSpace: "nowrap" }}>
+                  VIEW DETAILS ↗
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* MY KIT SLIDE-OUT DRAWER */}
@@ -807,122 +910,194 @@ export default function Home() {
           if (e.target === e.currentTarget) setSelectedProduct(null);
         }}
       >
-        {selectedProduct && (
-          <div className="modal">
-            <button
-              className="close"
-              onClick={() => setSelectedProduct(null)}
-            >
-              ×
-            </button>
+        {selectedProduct && (() => {
+          const isMaintenance = selectedProduct.status === "maintenance";
+          const isCertified = hasRequiredTraining(currentStudent, selectedProduct);
+          const requiredMod = getRequiredTrainingModule(selectedProduct);
+          const isBlocked = isMaintenance || (!isCertified && Boolean(selectedProduct.trainingRequired));
+          const isSelectedSaved = savedIds.includes(selectedProduct.id);
 
-            <div className="modal-layout">
-              <div style={{ width: "100%", height: "390px", overflow: "hidden" }}>
-                <EquipmentImage item={selectedProduct} />
-              </div>
+          return (
+            <div className="modal">
+              <button
+                className="close"
+                onClick={() => setSelectedProduct(null)}
+              >
+                ×
+              </button>
 
-              <div>
-                <div className="eyebrow">
-                  <b /> {selectedProduct.category.toUpperCase()} /{" "}
-                  {selectedProduct.model || selectedProduct.id.toUpperCase()}
+              <div className="modal-layout">
+                <div style={{ width: "100%", height: "390px", overflow: "hidden" }}>
+                  <EquipmentImage item={selectedProduct} />
                 </div>
-                <h2>{selectedProduct.name}</h2>
-                <div className="availability">
-                  {selectedProduct.status.toUpperCase()}
-                </div>
-                <p>{selectedProduct.description}</p>
 
-                <div className="spec-list">
-                  {Object.entries(selectedProduct.specs).map(([k, v]) => (
-                    <div key={k}>
-                      <span>{k.toUpperCase()}</span>
-                      <b>{v}</b>
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                    <div className="eyebrow">
+                      <b /> {selectedProduct.category.toUpperCase()} /{" "}
+                      {selectedProduct.model || selectedProduct.id.toUpperCase()}
                     </div>
-                  ))}
-                  <div>
-                    <span>LOCATION</span>
-                    <b>
-                      {selectedProduct.lab} · {selectedProduct.building}
-                    </b>
+                    <button
+                      onClick={() => toggleSave(selectedProduct.id)}
+                      style={{
+                        background: isSelectedSaved ? "var(--lime)" : "#f4f4ed",
+                        border: "1px solid #c9cbc1",
+                        padding: "4px 10px",
+                        font: "9px 'DM Mono', monospace",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        letterSpacing: ".06em",
+                      }}
+                    >
+                      {isSelectedSaved ? "♥ IN YOUR KIT" : "♡ SAVE TO KIT"}
+                    </button>
                   </div>
-                  {selectedProduct.trainingRequired && (
+
+                  <h2>{selectedProduct.name}</h2>
+                  <div className="availability">
+                    {selectedProduct.status.toUpperCase()}
+                  </div>
+                  <p>{selectedProduct.description}</p>
+
+                  <div className="spec-list">
+                    {Object.entries(selectedProduct.specs).map(([k, v]) => (
+                      <div key={k}>
+                        <span>{k.toUpperCase()}</span>
+                        <b>{v}</b>
+                      </div>
+                    ))}
                     <div>
-                      <span>TRAINING REQUIRED</span>
-                      <b
-                        style={{
-                          color: "#d7ff35",
-                          background: "#111",
-                          padding: "2px 6px",
-                        }}
-                      >
-                        {selectedProduct.trainingRequired.toUpperCase()}
+                      <span>LOCATION</span>
+                      <b>
+                        {selectedProduct.lab} · {selectedProduct.building}
                       </b>
                     </div>
-                  )}
-                </div>
-
-                {/* Booking Form connected to working logic */}
-                <form className="booking-form" onSubmit={handleBookingSubmit}>
-                  <div className="eyebrow">
-                    <b /> REQUEST ACCESS // AI PRIORITY QUEUE
+                    {selectedProduct.trainingRequired && (
+                      <div>
+                        <span>TRAINING REQUIRED</span>
+                        <b
+                          style={{
+                            color: isCertified ? "#d7ff35" : "#e05252",
+                            background: "#111",
+                            padding: "2px 6px",
+                          }}
+                        >
+                          {selectedProduct.trainingRequired.toUpperCase()}{" "}
+                          {isCertified ? "(CERTIFIED ✓)" : "(MISSING ✕)"}
+                        </b>
+                      </div>
+                    )}
                   </div>
 
-                  <label>PROJECT / COURSE TITLE</label>
-                  <input
-                    required
-                    placeholder="e.g. Autonomous Drone Low-Light Vision"
-                    value={projectTitle}
-                    onChange={(e) => setProjectTitle(e.target.value)}
-                  />
+                  {/* Booking Form connected to working logic */}
+                  <form className="booking-form" onSubmit={handleBookingSubmit}>
+                    <div className="eyebrow">
+                      <b /> REQUEST ACCESS // AI PRIORITY QUEUE
+                    </div>
 
-                  <label>PROJECT CLASSIFICATION</label>
-                  <select
-                    value={projectClassification}
-                    onChange={(e) => setProjectClassification(e.target.value as any)}
-                  >
-                    <option value="thesis">Thesis / Senior Capstone (Highest Weight)</option>
-                    <option value="research">Faculty-Sponsored Research</option>
-                    <option value="course">Course Assignment Lab</option>
-                    <option value="club">Student Competition Club</option>
-                    <option value="hobby">Exploratory / Independent</option>
-                  </select>
+                    {/* Blocking message if maintenance or missing certification */}
+                    {isBlocked && (
+                      <div
+                        style={{
+                          background: isMaintenance ? "#fbeaea" : "#fff8e6",
+                          border: `1px solid ${isMaintenance ? "#e05252" : "#d4a017"}`,
+                          color: isMaintenance ? "#a81d1d" : "#7d5a00",
+                          padding: "12px 14px",
+                          fontSize: "11px",
+                          fontFamily: "'DM Mono', monospace",
+                          margin: "14px 0",
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        <strong style={{ display: "block", marginBottom: "4px" }}>
+                          {isMaintenance
+                            ? "⚠ BOOKING BLOCKED: SCHEDULED MAINTENANCE"
+                            : "⚠ BOOKING BLOCKED: PREREQUISITE TRAINING MISSING"}
+                        </strong>
+                        {isMaintenance
+                          ? `This instrument (${selectedProduct.name}) is currently undergoing scheduled maintenance and is unavailable for reservations.`
+                          : `You are missing the required safety certification: "${requiredMod?.name || selectedProduct.trainingRequired}". Please complete the certification module in the safety portal before submitting an access request.`}
+                      </div>
+                    )}
 
-                  <label>PREFERRED DATE</label>
-                  <input
-                    type="date"
-                    required
-                    min={new Date().toISOString().slice(0, 10)}
-                    value={preferredDate}
-                    onChange={(e) => setPreferredDate(e.target.value)}
-                  />
+                    <label>PROJECT / COURSE TITLE</label>
+                    <input
+                      required
+                      placeholder="e.g. Autonomous Drone Low-Light Vision"
+                      value={projectTitle}
+                      onChange={(e) => setProjectTitle(e.target.value)}
+                      disabled={isBlocked}
+                    />
 
-                  <label>TIME SLOT</label>
-                  <select
-                    value={preferredSlot}
-                    onChange={(e) => setPreferredSlot(e.target.value)}
-                  >
-                    <option>09:00 – 11:00</option>
-                    <option>11:00 – 13:00</option>
-                    <option>14:00 – 16:00</option>
-                    <option>16:00 – 18:00</option>
-                  </select>
+                    <label>PROJECT CLASSIFICATION</label>
+                    <select
+                      value={projectClassification}
+                      onChange={(e) => setProjectClassification(e.target.value as any)}
+                      disabled={isBlocked}
+                    >
+                      <option value="thesis">Thesis / Senior Capstone (Highest Weight)</option>
+                      <option value="research">Faculty-Sponsored Research</option>
+                      <option value="course">Course Assignment Lab</option>
+                      <option value="club">Student Competition Club</option>
+                      <option value="hobby">Exploratory / Independent</option>
+                    </select>
 
-                  <label>RESEARCH JUSTIFICATION</label>
-                  <textarea
-                    required
-                    placeholder="Describe how this cross-department instrument supports your project objectives..."
-                    value={projectReason}
-                    onChange={(e) => setProjectReason(e.target.value)}
-                  />
+                    <label>PREFERRED DATE (DEADLINE)</label>
+                    <input
+                      type="date"
+                      required
+                      min={new Date().toISOString().slice(0, 10)}
+                      value={preferredDate}
+                      onChange={(e) => setPreferredDate(e.target.value)}
+                      disabled={isBlocked}
+                    />
 
-                  <button className="btn btn-dark" type="submit">
-                    SUBMIT ACCESS REQUEST <span>↗</span>
-                  </button>
-                </form>
+                    <label>TIME SLOT</label>
+                    <select
+                      value={preferredSlot}
+                      onChange={(e) => setPreferredSlot(e.target.value)}
+                      disabled={isBlocked}
+                    >
+                      <option>09:00 – 11:00</option>
+                      <option>11:00 – 13:00</option>
+                      <option>14:00 – 16:00</option>
+                      <option>16:00 – 18:00</option>
+                    </select>
+
+                    <label>RESEARCH JUSTIFICATION / ABSTRACT</label>
+                    <textarea
+                      required
+                      placeholder="Describe how this cross-department instrument supports your project objectives..."
+                      value={projectReason}
+                      onChange={(e) => setProjectReason(e.target.value)}
+                      disabled={isBlocked}
+                    />
+
+                    <button
+                      className={`btn ${isBlocked ? "" : "btn-dark"}`}
+                      type="submit"
+                      disabled={isBlocked}
+                      style={{
+                        cursor: isBlocked ? "not-allowed" : "pointer",
+                        background: isBlocked ? "#898c83" : "#111310",
+                        color: "#fff",
+                        opacity: isBlocked ? 0.75 : 1,
+                      }}
+                    >
+                      {isMaintenance
+                        ? "UNAVAILABLE · UNDER MAINTENANCE"
+                        : !isCertified && selectedProduct.trainingRequired
+                        ? `BLOCKED · ${selectedProduct.trainingRequired.toUpperCase()} REQUIRED`
+                        : "SUBMIT ACCESS REQUEST ↗"}
+                    </button>
+                  </form>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
       {/* FACULTY QUEUE MODAL WITH SCORE BARS */}
