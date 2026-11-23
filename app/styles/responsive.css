@@ -1,0 +1,214 @@
+@media(max-width:900px) {
+  .nav {
+    gap: 17px;
+    margin-left: 0;
+  }
+  .product-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .product-image {
+    height: 300px;
+  }
+  .section-pad {
+    padding: 85px 6%;
+  }
+  .dept-card {
+    height: 330px;
+    padding: 20px;
+  }
+  .hero-content {
+    left: 7%;
+  }
+  .intro-grid,
+  .manifesto-grid {
+    grid-template-columns: 1fr .7fr;
+    gap: 5%;
+  }
+}
+
+@media(max-width:650px) {
+  .announcement {
+    font-size: 8px;
+    gap: 6px;
+  }
+  .header {
+    height: 65px;
+    padding: 0 5%;
+  }
+  .logo {
+    font-size: 22px;
+  }
+  .nav {
+    display: none;
+    position: absolute;
+    top: 65px;
+    left: 0;
+    right: 0;
+    background: #111310;
+    padding: 25px;
+    flex-direction: column;
+  }
+  .nav.open {
+    display: flex;
+  }
+  .head-actions {
+    gap: 10px;
+  }
+  .garage-btn,
+  .queue-pill-btn {
+    padding: 8px 10px;
+    font-size: 8px;
+  }
+  .menu-btn {
+    display: block;
+    font-size: 20px;
+  }
+  .hero {
+    height: 680px;
+    min-height: 0;
+  }
+  .hero-content {
+    top: 18%;
+    left: 7%;
+    right: 6%;
+  }
+  .hero h1 {
+    font-size: clamp(72px, 18vw, 112px);
+  }
+  .hero-content>p {
+    font-size: 12px;
+    max-width: 310px;
+  }
+  .hero-stamp {
+    width: 80px;
+    height: 80px;
+    right: 7%;
+    bottom: 17%;
+    font-size: 10px;
+  }
+  .hero-meta {
+    font-size: 7px;
+  }
+  .hero-meta span:nth-child(2) {
+    display: none;
+  }
+  .section-pad {
+    padding: 70px 6%;
+  }
+  .intro-grid,
+  .manifesto-grid {
+    grid-template-columns: 1fr;
+    gap: 25px;
+  }
+  .intro h2,
+  .section-top h2,
+  .dept-heading h2,
+  .manifesto h2,
+  .how h2 {
+    font-size: clamp(48px, 13vw, 75px);
+  }
+  .intro-copy {
+    max-width: 360px;
+  }
+  .section-top {
+    align-items: start;
+    gap: 20px;
+    flex-direction: column;
+  }
+  .filter-row {
+    align-items: flex-start;
+    gap: 15px;
+    flex-direction: column;
+    margin-top: 35px;
+  }
+  .filters {
+    gap: 17px;
+    overflow: auto;
+    width: 100%;
+  }
+  .filter {
+    white-space: nowrap;
+  }
+  .sort-label {
+    align-self: flex-end;
+  }
+  .product-grid {
+    gap: 20px 10px;
+  }
+  .product-image {
+    height: 190px;
+  }
+  .product-info h3 {
+    font-size: 13px;
+  }
+  .product-tag {
+    font-size: 7px;
+  }
+  .catalog-bottom {
+    gap: 15px;
+    font-size: 8px;
+  }
+  .outline-btn {
+    padding: 12px;
+    font-size: 8px;
+  }
+  .dept-heading {
+    padding-bottom: 35px;
+  }
+  .dept-grid {
+    grid-template-columns: 1fr;
+  }
+  .dept-card {
+    height: 330px;
+  }
+  .manifesto-grid {
+    margin-top: 35px;
+  }
+  .steps {
+    grid-template-columns: 1fr;
+  }
+  .steps article {
+    border-right: 0;
+    border-bottom: 1px solid #4b5047;
+    margin: 0;
+    padding: 20px 0;
+  }
+  .steps h3 {
+    margin: 20px 0 8px;
+  }
+  .how h2 {
+    margin-bottom: 35px;
+  }
+  footer {
+    padding: 45px 6%;
+    grid-template-columns: 1fr 1fr;
+  }
+  footer p {
+    grid-column: 1/-1;
+    grid-row: 2;
+  }
+  footer div {
+    grid-column: 1/-1;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+  footer small {
+    grid-column: 1/-1;
+  }
+  .modal {
+    padding: 25px 18px;
+  }
+  .modal-layout {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+  .modal-layout img {
+    height: 240px;
+  }
+  .modal-layout h2 {
+    font-size: 32px;
+  }
+  .search-overlay {
+    padding: 18vh 7%;
+  }
+}

@@ -1,0 +1,87 @@
+.drawer-backdrop,
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: #0009;
+  z-index: 45;
+  opacity: 0;
+  pointer-events: none;
+  transition: .25s;
+}
+
+.drawer-backdrop.open,
+.modal-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.drawer {
+  position: fixed;
+  z-index: 46;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: min(440px, 100%);
+  background: var(--paper);
+  padding: 85px 35px 35px;
+  transform: translateX(100%);
+  transition: transform .3s;
+  overflow-y: auto;
+}
+
+.drawer.open {
+  transform: translateX(0);
+}
+
+.drawer h2 {
+  font-size: 55px;
+  letter-spacing: -.08em;
+  margin: 22px 0;
+}
+
+.drawer h2 em {
+  color: #8da62b;
+}
+
+.saved-items {
+  margin: 25px 0;
+  max-height: 55vh;
+  overflow: auto;
+}
+
+.saved-row {
+  display: flex;
+  gap: 14px;
+  border-top: 1px solid var(--line);
+  padding: 14px 0;
+}
+
+.saved-row img {
+  width: 76px;
+  height: 76px;
+  object-fit: cover;
+}
+
+.saved-row h4 {
+  margin: 4px 0;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.saved-row button {
+  border: 0;
+  background: none;
+  text-decoration: underline;
+  font: 9px 'DM Mono', monospace;
+  cursor: pointer;
+  color: #c93b2b;
+}
+
+.muted {
+  color: #777;
+  font-size: 13px;
+}
+
+.full {
+  width: 100%;
+}

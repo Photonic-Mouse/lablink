@@ -1,0 +1,92 @@
+.departments {
+  background: #101310;
+  color: white;
+}
+
+.dept-heading {
+  padding-bottom: 54px;
+}
+
+.dept-heading h2 {
+  margin: 30px 0 15px;
+}
+
+.dept-heading p {
+  color: #aeb3a7;
+  font-size: 13px;
+}
+
+.dept-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.dept-card {
+  height: 410px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 25px 28px;
+  background-size: cover;
+  background-position: center;
+  isolation: isolate;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.dept-card:before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, rgba(0, 0, 0, .8), rgba(0, 0, 0, .12));
+  z-index: -1;
+  transition: background .3s;
+}
+
+.dept-card:hover:before {
+  background: linear-gradient(0deg, rgba(0, 0, 0, .84), rgba(0, 0, 0, .35));
+}
+
+.dept-electronics {
+  background-image: url('https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=900&q=85');
+}
+
+.dept-mechanical {
+  background-image: url('https://images.unsplash.com/photo-1504917599217-d4dc5ebe6122?auto=format&fit=crop&w=900&q=85');
+}
+
+.dept-computerscience,
+.dept-computing {
+  background-image: url('https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=900&q=85');
+  background-position: 75% center;
+}
+
+.dept-chemistry {
+  background-image: url('https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=900&q=85');
+}
+
+.dept-biotech {
+  background-image: url('https://images.unsplash.com/photo-1579154204601-01588f351e67?auto=format&fit=crop&w=900&q=85');
+}
+
+.dept-card>span,
+.dept-card>b {
+  font: 9px 'DM Mono', monospace;
+  letter-spacing: .1em;
+}
+
+.dept-card h3 {
+  font-size: clamp(28px, 3vw, 48px);
+  letter-spacing: -.07em;
+  margin: 0;
+  color: white;
+}
+
+.dept-card h3 span {
+  color: var(--lime);
+}
+
+.dept-card>b {
+  color: var(--lime);
+}

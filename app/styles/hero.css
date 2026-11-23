@@ -1,0 +1,254 @@
+.hero {
+  height: min(740px, calc(100vh - 109px));
+  min-height: 570px;
+  position: relative;
+  background: #20251f;
+  color: white;
+  overflow: hidden;
+}
+
+.hero-image {
+  position: absolute;
+  inset: 0;
+  background-image: url('https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=2200&q=88');
+  background-size: cover;
+  background-position: center 46%;
+  filter: saturate(.65);
+}
+
+.hero-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(7, 10, 8, .88) 0%, rgba(7, 10, 8, .56) 47%, rgba(7, 10, 8, .12) 100%), linear-gradient(0deg, rgba(0, 0, 0, .5), transparent 35%);
+}
+
+.hero-content {
+  position: absolute;
+  left: 9%;
+  top: 15%;
+  max-width: 740px;
+}
+
+.eyebrow {
+  font: 10px 'DM Mono', monospace;
+  letter-spacing: .12em;
+  color: #6d7168;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.eyebrow b {
+  width: 7px;
+  height: 7px;
+  background: #91ad25;
+  display: inline-block;
+  border-radius: 50%;
+}
+
+.eyebrow.light {
+  color: #c4c7bc;
+}
+
+.hero h1 {
+  font-size: clamp(78px, 11vw, 156px);
+  line-height: .82;
+  letter-spacing: -.095em;
+  margin: 30px 0 28px;
+  font-weight: 800;
+}
+
+.hero h1 em,
+.intro h2 em,
+.section-top h2 em,
+.dept-heading h2 em,
+.manifesto h2 em,
+.how h2 em,
+.drawer h2 em {
+  font-style: normal;
+  color: var(--lime);
+}
+
+.hero-content>p {
+  max-width: 410px;
+  color: #d0d2ca;
+  line-height: 1.7;
+  font-size: 14px;
+}
+
+.hero-ctas {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  margin-top: 34px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 16px 20px;
+  font: 10px 'DM Mono', monospace;
+  letter-spacing: .08em;
+  border: 0;
+  cursor: pointer;
+  transition: transform .2s, background .2s;
+}
+
+.btn:hover {
+  transform: translateY(-3px);
+}
+
+.btn-lime {
+  background: var(--lime);
+  color: #111;
+  font-weight: bold;
+}
+
+.btn-dark {
+  background: #111310;
+  color: white;
+}
+
+.btn span {
+  font-size: 17px;
+}
+
+.text-link {
+  font: 10px 'DM Mono', monospace;
+  letter-spacing: .08em;
+  color: white;
+}
+
+.text-link span {
+  color: var(--lime);
+  margin-left: 8px;
+}
+
+.hero-meta {
+  position: absolute;
+  bottom: 24px;
+  left: 5.2%;
+  right: 5.2%;
+  display: flex;
+  justify-content: space-between;
+  color: #d2d5cb;
+  font: 9px 'DM Mono', monospace;
+  letter-spacing: .1em;
+}
+
+.hero-stamp {
+  position: absolute;
+  right: 7%;
+  bottom: 14%;
+  border: 1px solid #ffffff70;
+  border-radius: 50%;
+  width: 112px;
+  height: 112px;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  font: 13px 'DM Mono', monospace;
+  line-height: 1.5;
+  transform: rotate(12deg);
+}
+
+.hero-stamp small {
+  font-size: 7px;
+  color: var(--lime);
+}
+
+.ticker {
+  height: 53px;
+  background: var(--lime);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.ticker div {
+  font: 12px 'DM Mono', monospace;
+  letter-spacing: .12em;
+  word-spacing: 10px;
+  animation: marquee 26s linear infinite;
+  color: #111;
+  font-weight: 500;
+}
+
+.ticker b {
+  font-size: 17px;
+  margin: 0 14px;
+}
+
+@keyframes marquee {
+  to {
+    transform: translateX(-35%);
+  }
+}
+
+.section-pad {
+  padding: 110px 9%;
+}
+
+.intro {
+  background: var(--paper);
+}
+
+.intro-grid {
+  display: grid;
+  grid-template-columns: 1.4fr .6fr;
+  align-items: end;
+  gap: 8%;
+  margin-top: 42px;
+}
+
+.intro h2,
+.section-top h2,
+.dept-heading h2,
+.manifesto h2,
+.how h2 {
+  font-size: clamp(48px, 7vw, 92px);
+  line-height: .93;
+  letter-spacing: -.075em;
+  margin: 0;
+  font-weight: 800;
+}
+
+.intro h2 em,
+.section-top h2 em,
+.manifesto h2 em {
+  color: #8da62b;
+}
+
+.intro-copy {
+  max-width: 300px;
+  padding-bottom: 8px;
+}
+
+.intro-copy p,
+.manifesto-grid p {
+  font-size: 15px;
+  line-height: 1.8;
+  color: #5e6258;
+}
+
+.circle-link {
+  width: 52px;
+  height: 52px;
+  border: 1px solid #989b90;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+  margin-top: 24px;
+  transition: .2s;
+  cursor: pointer;
+}
+
+.circle-link:hover {
+  background: var(--lime);
+  border-color: var(--lime);
+  color: #111;
+}
