@@ -11,16 +11,26 @@ const departmentCopy = [
 export default function Departments({
   equipment,
   onDepartmentSelect,
+  searchQuery,
+  onSearchChange,
 }: {
   equipment: Equipment[];
   onDepartmentSelect: (department: string) => void;
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
 }) {
   return (
     <section className="making section-pad" id="departments">
-      <div className="making-heading">
-        <div className="eyebrow"><b /> 01 — FIND YOUR DISCIPLINE</div>
-        <h2>WHAT ARE YOU <em>MAKING?</em></h2>
-        <p>Start with your discipline. Find allocated gear across 5 engineering and science departments.</p>
+      <div className="making-top">
+        <div className="making-heading">
+          <div className="eyebrow"><b /> 01 — FIND YOUR DISCIPLINE</div>
+          <h2>WHAT ARE YOU <em>MAKING?</em></h2>
+          <p>Start with your discipline. Find allocated gear across 5 engineering and science departments.</p>
+        </div>
+        <label className="making-search">
+          <span>SEARCH PROJECT OR ITEM</span>
+          <input value={searchQuery} onChange={(event) => onSearchChange(event.target.value)} placeholder="Try ‘oscilloscope’, ‘robotics’, or ‘PCR’..." />
+        </label>
       </div>
       <div className="making-list">
         {departmentCopy.map(([department, label, name]) => {

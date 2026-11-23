@@ -627,7 +627,7 @@ export default function Home() {
         </section>
 
         {/* INTRO SECTION 01 */}
-        <Departments equipment={equipment} onDepartmentSelect={(department) => {
+        <Departments equipment={equipment} searchQuery={searchQuery} onSearchChange={setSearchQuery} onDepartmentSelect={(department) => {
           setActiveFilter(department);
           setIsCatalogueExpanded(false);
           setShownLimit(catalogColumns);
