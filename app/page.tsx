@@ -22,6 +22,7 @@ import {
 } from "@/lib/notifications";
 import { generateProjectRecommendations, EquipmentRecommendation, ProjectExtractionResult } from "@/lib/mockLLM";
 import Departments from "@/components/home/Departments";
+import ShowMore from "@/components/catalogue/ShowMore";
 
 const DEPARTMENTS = [
   "All",
@@ -105,7 +106,9 @@ export default function Home() {
   const [isFacultyQueueOpen, setIsFacultyQueueOpen] = useState(false);
   const [isNavOpen, setIsNavOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [shownLimit, setShownLimit] = useState(equipment.length);
+  const [catalogColumns, setCatalogColumns] = useState(4);
+  const [shownLimit, setShownLimit] = useState(4);
+  const [isCatalogueExpanded, setIsCatalogueExpanded] = useState(false);
 
   // Natural Language Search API state
   const [searchResults, setSearchResults] = useState<
@@ -317,6 +320,23 @@ export default function Home() {
   }
 
   const displayedEquipment = filteredEquipment.slice(0, shownLimit);
+
+  useEffect(() => {
+    const updateColumns = () => {
+      const grid = document.querySelector<HTMLElement>(".product-grid");
+      if (!grid) return;
+      const columns = getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean).length;
+      if (columns > 0) setCatalogColumns(columns);
+    };
+    updateColumns();
+    window.addEventListener("resize", updateColumns);
+    return () => window.removeEventListener("resize", updateColumns);
+  }, []);
+
+  useEffect(() => {
+    setIsCatalogueExpanded(false);
+    setShownLimit(catalogColumns);
+  }, [searchQuery, sortBy, catalogColumns]);
 
   // Handle Booking Submission with safety validation and automated multi-factor scoring
   const handleBookingSubmit = (e: React.FormEvent) => {
@@ -609,6 +629,8 @@ export default function Home() {
         {/* INTRO SECTION 01 */}
         <Departments equipment={equipment} onDepartmentSelect={(department) => {
           setActiveFilter(department);
+          setIsCatalogueExpanded(false);
+          setShownLimit(catalogColumns);
           document.getElementById("catalog")?.scrollIntoView({ behavior: "smooth" });
         }} />
 
@@ -629,6 +651,7 @@ export default function Home() {
               onClick={(e) => {
                 e.preventDefault();
                 setActiveFilter("All");
+                setIsCatalogueExpanded(true);
                 setShownLimit(equipment.length);
                 showToast("SHOWING ALL 40 INSTRUMENTS");
               }}
@@ -649,7 +672,8 @@ export default function Home() {
                     className={`filter ${isActive ? "active" : ""}`}
                     onClick={() => {
                       setActiveFilter(deptName);
-                      setShownLimit(equipment.length);
+                      setIsCatalogueExpanded(false);
+                      setShownLimit(catalogColumns);
                     }}
                   >
                     {deptName === "All" ? "ALL GEAR" : deptName.toUpperCase()}{" "}
@@ -725,20 +749,27 @@ export default function Home() {
             })}
           </div>
 
-          {/* Catalogue Bottom Pagination */}
-          <div className="catalog-bottom">
-            <span>
-              SHOWING <b>{String(displayedEquipment.length).padStart(2, "0")}</b> OF {equipment.length} RESOURCES
-            </span>
-            {displayedEquipment.length < filteredEquipment.length && (
-              <button
-                className="outline-btn"
-                onClick={() => setShownLimit(equipment.length)}
-              >
-                LOAD ALL {equipment.length} INSTRUMENTS ↗
-              </button>
-            )}
-          </div>
+          <ShowMore
+            shown={displayedEquipment.length}
+            total={filteredEquipment.length}
+            isExpanded={isCatalogueExpanded || displayedEquipment.length >= filteredEquipment.length}
+            onToggle={() => {
+              if (isCatalogueExpanded || displayedEquipment.length >= filteredEquipment.length) {
+                setIsCatalogueExpanded(false);
+                setShownLimit(catalogColumns);
+                document.getElementById("catalog")?.scrollIntoView({ behavior: "smooth" });
+              } else {
+                const nextLimit = Math.min(shownLimit + catalogColumns, filteredEquipment.length);
+                setShownLimit(nextLimit);
+                setIsCatalogueExpanded(nextLimit >= filteredEquipment.length);
+              }
+            }}
+            onBrowse={() => {
+              setIsCatalogueExpanded(true);
+              setShownLimit(filteredEquipment.length);
+              document.getElementById("catalog")?.scrollIntoView({ behavior: "smooth" });
+            }}
+          />
         </section>
 
         {/* MANIFESTO SECTION 04 */}
