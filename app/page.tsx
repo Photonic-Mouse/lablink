@@ -160,6 +160,20 @@ export default function Home() {
 
   // Live call to /api/search for natural language queries
   useEffect(() => {
+    const closeOverlays = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setIsAutoSearchOpen(false);
+      setIsSearchOpen(false);
+      setIsNotificationsOpen(false);
+      setIsOrdersOpen(false);
+      setIsDrawerOpen(false);
+      setIsFacultyQueueOpen(false);
+    };
+    window.addEventListener("keydown", closeOverlays);
+    return () => window.removeEventListener("keydown", closeOverlays);
+  }, []);
+
+  useEffect(() => {
     const q = searchQuery.trim();
     if (!q) {
       setSearchResults([]);

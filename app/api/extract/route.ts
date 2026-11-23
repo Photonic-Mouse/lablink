@@ -3,6 +3,7 @@ import { equipment } from "@/lib/seed";
 import { EquipmentRecommendation, generateProjectRecommendations, ProjectExtractionResult } from "@/lib/mockLLM";
 
 const emptyResult: ProjectExtractionResult = { recommendations: [], skills: [], trainingRequired: [] };
+const MAX_DESCRIPTION_LENGTH = 6000;
 
 async function extractWithGemini(description: string): Promise<ProjectExtractionResult | null> {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -41,7 +42,8 @@ async function extractWithGemini(description: string): Promise<ProjectExtraction
   const payload = await response.json();
   const text = payload.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) return null;
-  const parsed = JSON.parse(text) as { recommendations?: Array<{ equipmentId: string; reason: string; estimatedHours: number; quantity: number }>; skills?: string[]; trainingRequired?: string[] };
+  let parsed: { recommendations?: Array<{ equipmentId: string; reason: string; estimatedHours: number; quantity: number }>; skills?: string[]; trainingRequired?: string[] };
+  try { parsed = JSON.parse(text); } catch { return null; }
   const recommendations: EquipmentRecommendation[] = (parsed.recommendations || []).flatMap((recommendation) => {
     const item = equipment.find((entry) => entry.id === recommendation.equipmentId);
     return item ? [{ equipment: item, reason: recommendation.reason, estimatedHours: Math.max(1, recommendation.estimatedHours || 4), quantity: Math.max(1, recommendation.quantity || 1) }] : [];
@@ -54,6 +56,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const description = typeof body.description === "string" ? body.description.trim() : "";
     if (!description) return NextResponse.json(emptyResult);
+    if (description.length > MAX_DESCRIPTION_LENGTH) return NextResponse.json({ error: `Project description must be ${MAX_DESCRIPTION_LENGTH} characters or fewer.` }, { status: 413 });
     try {
       const aiResult = await extractWithGemini(description);
       if (aiResult) return NextResponse.json(aiResult);
