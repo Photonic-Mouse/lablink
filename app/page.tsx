@@ -103,6 +103,7 @@ export default function Home() {
   >([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isAutoSearchOpen, setIsAutoSearchOpen] = useState(false);
+  const [hasAutoSearched, setHasAutoSearched] = useState(false);
   const [projectDescription, setProjectDescription] = useState("");
   const [isExtracting, setIsExtracting] = useState(false);
   const [autoSearchResults, setAutoSearchResults] = useState<EquipmentRecommendation[]>([]);
@@ -162,6 +163,7 @@ export default function Home() {
 
   const handleAutoGenerate = async () => {
     if (!projectDescription.trim()) return;
+    setHasAutoSearched(true);
     setIsExtracting(true);
     try {
       const res = await fetch("/api/extract", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ description: projectDescription }) });
@@ -184,7 +186,7 @@ export default function Home() {
 
   const resetAutoSearch = () => {
     setProjectDescription(""); setAutoSearchResults([]); setExtractedSkills([]); setRequiredCertifications([]);
-    setSelectedAutoIds([]); setAutoItemQuery(""); setAutoItemResults([]);
+    setSelectedAutoIds([]); setAutoItemQuery(""); setAutoItemResults([]); setHasAutoSearched(false);
   };
 
   // Faculty Queue state
@@ -469,7 +471,7 @@ export default function Home() {
               instruments across {DEPARTMENTS.length - 1} academic departments.
             </p>
             <div className="hero-ctas">
-              <button className="btn btn-lime" onClick={() => setIsAutoSearchOpen(true)}>
+              <button className="btn btn-lime" onClick={() => { resetAutoSearch(); setIsAutoSearchOpen(true); }}>
                 SEARCH AUTOMATICALLY <span>↗</span>
               </button>
               <a className="text-link" href="#departments">
@@ -833,12 +835,19 @@ export default function Home() {
         <small>© 2026 LABLINK · BMSCE RESOURCE NETWORK · BUILT FOR CROSS-DISCIPLINARY INNOVATION</small>
       </footer>
 
-      <div className={`search-overlay auto-search-overlay ${isAutoSearchOpen ? "open" : ""}`}>
+      <div className={`search-overlay auto-search-overlay ${isAutoSearchOpen ? "open" : ""}`} style={{ background: "rgba(17, 19, 16, .62)", padding: "8vh 8%" }}>
+        <div style={{ maxWidth: "900px", margin: "0 auto", background: "#e9e9e2", padding: "48px", minHeight: hasAutoSearched ? "auto" : "280px", position: "relative" }}>
         <button className="close" onClick={() => setIsAutoSearchOpen(false)}>×</button>
         <div className="eyebrow"><b /> SEARCH AUTOMATICALLY</div>
-        <h2>TURN A PROJECT IDEA INTO A <em>LAB KIT.</em></h2>
-        <textarea value={projectDescription} onChange={(e) => setProjectDescription(e.target.value)} placeholder="Paste your project description, methods, materials, or research goals..." rows={5} />
-        <button className="btn btn-dark" onClick={handleAutoGenerate} disabled={isExtracting}>{isExtracting ? "ANALYSING PROJECT..." : "GENERATE"}</button>
+        {!hasAutoSearched && <>
+          <h2>WHAT ARE YOU <em>BUILDING?</em></h2>
+          <form onSubmit={(event) => { event.preventDefault(); handleAutoGenerate(); }} style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+            <input autoFocus={isAutoSearchOpen} value={projectDescription} onChange={(e) => setProjectDescription(e.target.value)} placeholder="Paste your project description..." style={{ flex: 1 }} />
+            <button className="btn btn-dark" type="submit" disabled={isExtracting} aria-label="Search">{isExtracting ? "…" : "↵"}</button>
+          </form>
+        </>}
+        {hasAutoSearched && <>
+        <h2>YOUR PROJECT <em>LAB KIT.</em></h2>
         {isExtracting && <p>Reading your project and matching instruments across the campus catalogue…</p>}
         {!isExtracting && projectDescription && autoSearchResults.length === 0 && <p>We couldn’t find a confident match yet. Try adding a method, material, or instrument type.</p>}
         {(extractedSkills.length > 0 || requiredCertifications.length > 0) && <div className="search-match-reason"><strong>EXTRACTED SKILLS:</strong> {extractedSkills.join(" · ")}<br /><strong>TRAINING:</strong> {requiredCertifications.length ? requiredCertifications.join(" · ") : "No additional certification detected"}</div>}
@@ -856,6 +865,8 @@ export default function Home() {
           <button className="btn btn-lime" onClick={() => addAutoItemsToKit(autoSearchResults.map(({ equipment: item }) => item.id))}>ADD EVERYTHING TO KIT</button>
           <button className="btn btn-dark" onClick={() => addAutoItemsToKit(selectedAutoIds)}>ADD SELECTED TO KIT</button>
           <button className="text-link" onClick={resetAutoSearch}>START OVER</button>
+        </div>
+        </>}
         </div>
       </div>
 
