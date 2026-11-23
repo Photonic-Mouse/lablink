@@ -37,14 +37,14 @@ export function resetDemo(): LabDatabase {
     specs: { ...item.specs },
     tags: [...item.tags],
   }));
-  db.students = students.map((s) => ({ ...s, certs: [...s.certs] }));
-  db.bookings = initialBookings.map((b) => ({
+  db.students = students.map((s: Student) => ({ ...s, certs: [...s.certs] }));
+  db.bookings = initialBookings.map((b: BookingRequest) => ({
     ...b,
     equipmentIds: [...b.equipmentIds],
     equipmentNames: b.equipmentNames ? [...b.equipmentNames] : undefined,
     factors: b.factors ? { ...b.factors } : undefined,
   }));
-  db.notifications = initialNotifications.map((n) => ({ ...n }));
+  db.notifications = initialNotifications.map((n: Notification) => ({ ...n }));
   return db;
 }
 

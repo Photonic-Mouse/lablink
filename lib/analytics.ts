@@ -66,7 +66,7 @@ export function getDepartmentUtilization(): DepartmentUtilization[] {
   return depts.map((dept) => {
     const deptEquipment = equipment.filter((e) => e.dept === dept);
     const eqIds = new Set(deptEquipment.map((e) => e.id));
-    const deptBookings = bookings.filter((b) => b.equipmentIds.some((id) => eqIds.has(id)));
+    const deptBookings = bookings.filter((b) => b.equipmentIds.some((id: string) => eqIds.has(id)));
     const totalHours = deptBookings.length * 3;
 
     return {
