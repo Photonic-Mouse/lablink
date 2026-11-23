@@ -17,6 +17,7 @@ import {
   notifyBookingApproved,
   notifyBookingRejected,
 } from "@/lib/notifications";
+import { generateProjectRecommendations, EquipmentRecommendation, ProjectExtractionResult } from "@/lib/mockLLM";
 
 const DEPARTMENTS = [
   "All",
@@ -101,6 +102,15 @@ export default function Home() {
     Array<{ equipment: Equipment; score: number; matchReason: string }>
   >([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isAutoSearchOpen, setIsAutoSearchOpen] = useState(false);
+  const [projectDescription, setProjectDescription] = useState("");
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [autoSearchResults, setAutoSearchResults] = useState<EquipmentRecommendation[]>([]);
+  const [extractedSkills, setExtractedSkills] = useState<string[]>([]);
+  const [requiredCertifications, setRequiredCertifications] = useState<string[]>([]);
+  const [selectedAutoIds, setSelectedAutoIds] = useState<string[]>([]);
+  const [autoItemQuery, setAutoItemQuery] = useState("");
+  const [autoItemResults, setAutoItemResults] = useState<Array<{ equipment: Equipment; score: number; matchReason: string }>>([]);
 
   // Active student session (Maya Lin, Computer Science Senior)
   const currentStudent = db.students[0] || {
@@ -139,6 +149,43 @@ export default function Home() {
 
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  useEffect(() => {
+    const q = autoItemQuery.trim();
+    if (!q) { setAutoItemResults([]); return; }
+    const timer = setTimeout(async () => {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+      if (res.ok) setAutoItemResults((await res.json()).results || []);
+    }, 180);
+    return () => clearTimeout(timer);
+  }, [autoItemQuery]);
+
+  const handleAutoGenerate = async () => {
+    if (!projectDescription.trim()) return;
+    setIsExtracting(true);
+    try {
+      const res = await fetch("/api/extract", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ description: projectDescription }) });
+      const result: ProjectExtractionResult = res.ok ? await res.json() : generateProjectRecommendations(projectDescription);
+      setAutoSearchResults(result.recommendations); setExtractedSkills(result.skills); setRequiredCertifications(result.trainingRequired);
+      setSelectedAutoIds(result.recommendations.map(({ equipment: item }) => item.id));
+    } catch {
+      const result = generateProjectRecommendations(projectDescription);
+      setAutoSearchResults(result.recommendations); setExtractedSkills(result.skills); setRequiredCertifications(result.trainingRequired);
+      setSelectedAutoIds(result.recommendations.map(({ equipment: item }) => item.id));
+    } finally { setIsExtracting(false); }
+  };
+
+  const addAutoItemsToKit = (ids: string[]) => {
+    const nextIds = Array.from(new Set([...savedIds, ...ids]));
+    setSavedIds(nextIds);
+    try { localStorage.setItem("lablinkSaved", JSON.stringify(nextIds)); } catch {}
+    showToast(`${ids.length} ITEM${ids.length === 1 ? "" : "S"} ADDED TO YOUR KIT`);
+  };
+
+  const resetAutoSearch = () => {
+    setProjectDescription(""); setAutoSearchResults([]); setExtractedSkills([]); setRequiredCertifications([]);
+    setSelectedAutoIds([]); setAutoItemQuery(""); setAutoItemResults([]);
+  };
 
   // Faculty Queue state
   const [bookings, setBookings] = useState<BookingRequest[]>(initialBookings);
@@ -422,9 +469,9 @@ export default function Home() {
               instruments across {DEPARTMENTS.length - 1} academic departments.
             </p>
             <div className="hero-ctas">
-              <a className="btn btn-lime" href="#catalog">
-                EXPLORE {equipment.length} INSTRUMENTS <span>↗</span>
-              </a>
+              <button className="btn btn-lime" onClick={() => setIsAutoSearchOpen(true)}>
+                SEARCH AUTOMATICALLY <span>↗</span>
+              </button>
               <a className="text-link" href="#departments">
                 FIND YOUR DISCIPLINE <span>↓</span>
               </a>
@@ -785,6 +832,32 @@ export default function Home() {
         </div>
         <small>© 2026 LABLINK · BMSCE RESOURCE NETWORK · BUILT FOR CROSS-DISCIPLINARY INNOVATION</small>
       </footer>
+
+      <div className={`search-overlay auto-search-overlay ${isAutoSearchOpen ? "open" : ""}`}>
+        <button className="close" onClick={() => setIsAutoSearchOpen(false)}>×</button>
+        <div className="eyebrow"><b /> SEARCH AUTOMATICALLY</div>
+        <h2>TURN A PROJECT IDEA INTO A <em>LAB KIT.</em></h2>
+        <textarea value={projectDescription} onChange={(e) => setProjectDescription(e.target.value)} placeholder="Paste your project description, methods, materials, or research goals..." rows={5} />
+        <button className="btn btn-dark" onClick={handleAutoGenerate} disabled={isExtracting}>{isExtracting ? "ANALYSING PROJECT..." : "GENERATE"}</button>
+        {isExtracting && <p>Reading your project and matching instruments across the campus catalogue…</p>}
+        {!isExtracting && projectDescription && autoSearchResults.length === 0 && <p>We couldn’t find a confident match yet. Try adding a method, material, or instrument type.</p>}
+        {(extractedSkills.length > 0 || requiredCertifications.length > 0) && <div className="search-match-reason"><strong>EXTRACTED SKILLS:</strong> {extractedSkills.join(" · ")}<br /><strong>TRAINING:</strong> {requiredCertifications.length ? requiredCertifications.join(" · ") : "No additional certification detected"}</div>}
+        {autoSearchResults.length > 0 && <div className="search-results">
+          {autoSearchResults.map(({ equipment: item, reason, estimatedHours, quantity }) => <div className="search-result-item" key={item.id}>
+            <input type="checkbox" checked={selectedAutoIds.includes(item.id)} onChange={() => setSelectedAutoIds((ids) => ids.includes(item.id) ? ids.filter((id) => id !== item.id) : [...ids, item.id])} />
+            <span style={{ fontSize: "24px" }}>{item.imageEmoji}</span>
+            <div style={{ flex: 1 }}><h4>{item.name}</h4><p>{reason}</p><small>{estimatedHours} estimated hours · quantity {quantity}</small></div>
+            <button className="close" onClick={() => { setAutoSearchResults((items) => items.filter(({ equipment: current }) => current.id !== item.id)); setSelectedAutoIds((ids) => ids.filter((id) => id !== item.id)); }}>×</button>
+          </div>)}
+        </div>}
+        <input value={autoItemQuery} onChange={(e) => setAutoItemQuery(e.target.value)} placeholder="Add more items — search the catalogue..." />
+        {autoItemResults.map(({ equipment: item }) => <button key={item.id} className="search-result-item" onClick={() => { if (!autoSearchResults.some(({ equipment: current }) => current.id === item.id)) { setAutoSearchResults((items) => [...items, { equipment: item, reason: "Added from your catalogue search.", estimatedHours: 4, quantity: 1 }]); setSelectedAutoIds((ids) => [...ids, item.id]); } setAutoItemQuery(""); }}>{item.imageEmoji} {item.name}</button>)}
+        <div className="hero-ctas">
+          <button className="btn btn-lime" onClick={() => addAutoItemsToKit(autoSearchResults.map(({ equipment: item }) => item.id))}>ADD EVERYTHING TO KIT</button>
+          <button className="btn btn-dark" onClick={() => addAutoItemsToKit(selectedAutoIds)}>ADD SELECTED TO KIT</button>
+          <button className="text-link" onClick={resetAutoSearch}>START OVER</button>
+        </div>
+      </div>
 
       {/* SEARCH OVERLAY */}
       <div className={`search-overlay ${isSearchOpen ? "open" : ""}`}>
