@@ -23,6 +23,7 @@ import {
 import { generateProjectRecommendations, EquipmentRecommendation, ProjectExtractionResult } from "@/lib/mockLLM";
 import Departments from "@/components/home/Departments";
 import ShowMore from "@/components/catalogue/ShowMore";
+import DemoGate from "@/components/DemoGate";
 
 const DEPARTMENTS = [
   "All",
@@ -109,6 +110,7 @@ export default function Home() {
   const [catalogColumns, setCatalogColumns] = useState(4);
   const [shownLimit, setShownLimit] = useState(4);
   const [isCatalogueExpanded, setIsCatalogueExpanded] = useState(false);
+  const [isDemoGateOpen, setIsDemoGateOpen] = useState(true);
 
   // Natural Language Search API state
   const [searchResults, setSearchResults] = useState<
@@ -502,6 +504,7 @@ export default function Home() {
 
   return (
     <>
+      {isDemoGateOpen && <DemoGate onClose={() => setIsDemoGateOpen(false)} />}
       {/* Top Announcement Bar */}
       <div className="announcement">
         BMSCE LABLINK <span>—</span> CROSS-DEPARTMENT LAB EQUIPMENT SHARING & AI-DRIVEN ALLOCATION.{" "}
