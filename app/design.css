@@ -698,7 +698,7 @@ textarea {
 
 .dept-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
 .dept-card {
@@ -732,13 +732,22 @@ textarea {
   background-image: url('https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=900&q=85');
 }
 
-.dept-robotics {
-  background-image: url('https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&w=900&q=85');
+.dept-mechanical {
+  background-image: url('https://images.unsplash.com/photo-1504917599217-d4dc5ebe6122?auto=format&fit=crop&w=900&q=85');
 }
 
+.dept-computerscience,
 .dept-computing {
   background-image: url('https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=900&q=85');
   background-position: 75% center;
+}
+
+.dept-chemistry {
+  background-image: url('https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=900&q=85');
+}
+
+.dept-biotech {
+  background-image: url('https://images.unsplash.com/photo-1579154204601-01588f351e67?auto=format&fit=crop&w=900&q=85');
 }
 
 .dept-card>span,

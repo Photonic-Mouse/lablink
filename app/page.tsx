@@ -1,14 +1,90 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { equipment, initialBookings, calculateScore, defaultWeights, Equipment, BookingRequest, Weights } from "@/lib/seed";
+import {
+  equipment,
+  initialBookings,
+  calculateScore,
+  defaultWeights,
+  Equipment,
+  BookingRequest,
+  Weights,
+} from "@/lib/seed";
 import { db } from "@/lib/db";
-import { hasRequiredTraining, getRequiredTrainingModule } from "@/lib/training";
-import { notifyBookingSubmitted, notifyBookingApproved, notifyBookingRejected, notifyWaitlistPromoted } from "@/lib/notifications";
-import { promoteNextInWaitlist } from "@/lib/waitlist";
+import { hasRequiredTraining } from "@/lib/training";
+import {
+  notifyBookingSubmitted,
+  notifyBookingApproved,
+  notifyBookingRejected,
+} from "@/lib/notifications";
+
+const DEPARTMENTS = [
+  "All",
+  "Electronics",
+  "Mechanical",
+  "Computer Science",
+  "Chemistry",
+  "Biotech",
+] as const;
+
+function EquipmentImage({
+  item,
+  className,
+  style,
+}: {
+  item: Equipment;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  const [failed, setFailed] = useState(false);
+
+  const deptColors: Record<string, string> = {
+    Electronics: "#1e293b",
+    Mechanical: "#334155",
+    "Computer Science": "#172554",
+    Chemistry: "#064e3b",
+    Biotech: "#4c1d95",
+  };
+
+  const bg = deptColors[item.dept] || "#20251f";
+
+  if (failed || !item.imageUrl) {
+    return (
+      <div
+        className={className}
+        style={{
+          ...style,
+          display: "grid",
+          placeItems: "center",
+          background: bg,
+          width: "100%",
+          height: "100%",
+          color: "#fff",
+          fontSize: "64px",
+          userSelect: "none",
+        }}
+      >
+        <span role="img" aria-label={item.name}>
+          {item.imageEmoji || "🔬"}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      loading="lazy"
+      src={item.imageUrl}
+      alt={item.name}
+      className={className}
+      style={style}
+      onError={() => setFailed(true)}
+    />
+  );
+}
 
 export default function Home() {
-  const [activeFilter, setActiveFilter] = useState("All");
+  const [activeFilter, setActiveFilter] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("featured");
   const [savedIds, setSavedIds] = useState<string[]>([]);
@@ -18,12 +94,14 @@ export default function Home() {
   const [isFacultyQueueOpen, setIsFacultyQueueOpen] = useState(false);
   const [isNavOpen, setIsNavOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [shownLimit, setShownLimit] = useState(8);
+  const [shownLimit, setShownLimit] = useState(equipment.length);
 
   // Faculty Queue state
   const [bookings, setBookings] = useState<BookingRequest[]>(initialBookings);
   const [weights, setWeights] = useState<Weights>(defaultWeights);
-  const [selectedQueueReqId, setSelectedQueueReqId] = useState<string>(initialBookings[0]?.id || "");
+  const [selectedQueueReqId, setSelectedQueueReqId] = useState<string>(
+    initialBookings[0]?.id || ""
+  );
   const [showWeightTuner, setShowWeightTuner] = useState(false);
 
   // Booking Form state in modal
@@ -31,7 +109,9 @@ export default function Home() {
   const [preferredDate, setPreferredDate] = useState("");
   const [preferredSlot, setPreferredSlot] = useState("09:00 – 11:00");
   const [projectReason, setProjectReason] = useState("");
-  const [projectClassification, setProjectClassification] = useState<"thesis" | "research" | "course" | "club" | "hobby">("thesis");
+  const [projectClassification, setProjectClassification] = useState<
+    "thesis" | "research" | "course" | "club" | "hobby"
+  >("thesis");
 
   useEffect(() => {
     try {
@@ -61,15 +141,26 @@ export default function Home() {
     } catch {}
   };
 
+  // Helper count for real department stats
+  const getDeptCount = (d: string) => {
+    if (d === "All") return equipment.length;
+    return equipment.filter((e) => e.dept.toLowerCase() === d.toLowerCase()).length;
+  };
+
   // Filter & Sort equipment catalogue
   let filteredEquipment = equipment.filter((item) => {
     const matchDept =
       activeFilter === "All" ||
-      item.dept.toLowerCase() === activeFilter.toLowerCase() ||
-      item.category.toLowerCase().includes(activeFilter.toLowerCase());
+      item.dept.toLowerCase() === activeFilter.toLowerCase();
     const matchSearch =
       searchQuery.trim() === "" ||
-      (item.name + item.dept + item.category + item.description + Object.values(item.specs).join(" "))
+      (
+        item.name +
+        item.dept +
+        item.category +
+        item.description +
+        Object.values(item.specs).join(" ")
+      )
         .toLowerCase()
         .includes(searchQuery.toLowerCase());
     return matchDept && matchSearch;
@@ -86,11 +177,10 @@ export default function Home() {
     e.preventDefault();
     if (!selectedProduct) return;
 
-    // Check safety certification
     const student = db.students[0] || {
       id: "stu-001",
       name: "Student Researcher",
-      dept: "Engineering",
+      dept: "Computer Science",
       year: 4,
       certs: ["oscilloscope-basics", "3d-printer-safety"],
       usageHoursLast30d: 6,
@@ -122,7 +212,7 @@ export default function Home() {
       equipmentNames: [selectedProduct.name],
       slotStart: `${preferredDate} ${preferredSlot.split(" – ")[0]}`,
       slotEnd: `${preferredDate} ${preferredSlot.split(" – ")[1] || "13:00"}`,
-      projectTitle: projectTitle || "Engineering Capstone Prototyping",
+      projectTitle: projectTitle || "Cross-Department Research Prototyping",
       projectType: projectClassification,
       projectSummary: projectReason || "Academic research requiring precision lab equipment.",
       deadline: `${preferredDate} (Target Date)`,
@@ -173,7 +263,9 @@ export default function Home() {
   };
 
   const handleWaitlistQueue = (id: string) => {
-    const updated = bookings.map((b) => (b.id === id ? { ...b, status: "waitlisted" as const } : b));
+    const updated = bookings.map((b) =>
+      b.id === id ? { ...b, status: "waitlisted" as const } : b
+    );
     setBookings(updated);
     db.bookings = updated;
     showToast("CANDIDATE PLACED ON WAITLIST");
@@ -186,8 +278,8 @@ export default function Home() {
     <>
       {/* Top Announcement Bar */}
       <div className="announcement">
-        CAMPUS RESOURCE NETWORK <span>—</span> ONE CAMPUS. MORE POSSIBILITIES.{" "}
-        <a href="#catalog">EXPLORE EQUIPMENT ↗</a>
+        BMSCE LABLINK <span>—</span> CROSS-DEPARTMENT LAB EQUIPMENT SHARING & AI-DRIVEN ALLOCATION.{" "}
+        <a href="#catalog">EXPLORE {equipment.length} INSTRUMENTS ↗</a>
       </div>
 
       {/* Main Header */}
@@ -256,60 +348,60 @@ export default function Home() {
           <div className="hero-shade" />
           <div className="hero-content">
             <div className="eyebrow light">
-              <b /> THE CAMPUS LAB MARKETPLACE
+              <b /> AI-DRIVEN UNIVERSITY LAB RESOURCE PLATFORM
             </div>
             <h1>
-              MAKE
-              <br />
-              IT <em>HAPPEN.</em>
+              MAKE<br />
+              RESEARCH <em>HAPPEN.</em>
             </h1>
             <p>
-              Big ideas need the right tools. Find and book the equipment that takes your next project further.
+              Cross-department lab equipment sharing powered by AI matching and fair,
+              faculty-approved allocation. Discover and book {equipment.length} precision
+              instruments across {DEPARTMENTS.length - 1} academic departments.
             </p>
             <div className="hero-ctas">
               <a className="btn btn-lime" href="#catalog">
-                EXPLORE EQUIPMENT <span>↗</span>
+                EXPLORE {equipment.length} INSTRUMENTS <span>↗</span>
               </a>
               <a className="text-link" href="#departments">
-                FIND YOUR FIELD <span>↓</span>
+                FIND YOUR DISCIPLINE <span>↓</span>
               </a>
             </div>
           </div>
           <div className="hero-meta">
-            <span>01 / 04</span>
-            <span>ENGINEERED FOR CURIOSITY</span>
+            <span>01 / 05</span>
+            <span>CROSS-DEPARTMENT SHARING · AI MATCHING · FACULTY-APPROVED</span>
             <span>SCROLL TO EXPLORE ↓</span>
           </div>
           <div className="hero-stamp">
-            BMSCE
-            <br />
-            <small>RESOURCE NETWORK</small>
+            BMSCE<br />
+            <small>LAB ALLOCATION</small>
           </div>
         </section>
 
         {/* MARQUEE TICKER */}
         <section className="ticker">
           <div>
-            DISCOVER <b>✳</b> REQUEST <b>✳</b> BUILD <b>✳</b> REPEAT <b>✳</b> DISCOVER <b>✳</b> REQUEST <b>✳</b> BUILD <b>✳</b> REPEAT <b>✳</b> DISCOVER <b>✳</b> REQUEST <b>✳</b> BUILD <b>✳</b> REPEAT <b>✳</b>
+            CROSS-DEPARTMENT SHARING <b>✳</b> AI MATCHING <b>✳</b> FAIR FACULTY-APPROVED ALLOCATION <b>✳</b> ZERO BOTTLENECKS <b>✳</b> PREVENT MONOPOLIZATION <b>✳</b> CROSS-DEPARTMENT SHARING <b>✳</b> AI MATCHING <b>✳</b> FAIR FACULTY-APPROVED ALLOCATION <b>✳</b>
           </div>
         </section>
 
-        {/* INTRO SECTION */}
+        {/* INTRO SECTION 01 */}
         <section className="intro section-pad">
           <div className="eyebrow">
-            <b /> 01 — FIND YOUR EDGE
+            <b /> 01 — CROSS-DEPARTMENT SHARING
           </div>
           <div className="intro-grid">
             <h2>
-              THE RIGHT
-              <br />
-              TOOLS CHANGE
-              <br />
+              THE RIGHT<br />
+              TOOLS CHANGE<br />
               <em>EVERYTHING.</em>
             </h2>
             <div className="intro-copy">
               <p>
-                From precision instruments to powerful workstations, the resources you need are closer than you think.
+                Break departmental silos. Whether your project requires high-speed oscilloscopes,
+                5-axis CNC machining, GPU compute clusters, or gene sequencing, LabLink matches
+                researchers to campus instruments with automated safety training checks.
               </p>
               <a className="circle-link" href="#catalog">
                 ↘
@@ -318,12 +410,12 @@ export default function Home() {
           </div>
         </section>
 
-        {/* SHOWCASE SECTION (CATALOGUE) */}
+        {/* SHOWCASE SECTION 02 (CATALOGUE) */}
         <section className="showcase section-pad" id="catalog">
           <div className="section-top">
             <div>
               <div className="eyebrow">
-                <b /> 02 — THE EQUIPMENT EDIT
+                <b /> 02 — THE EQUIPMENT CATALOGUE
               </div>
               <h2>
                 BUILT TO <em>BUILD.</em>
@@ -336,29 +428,33 @@ export default function Home() {
                 e.preventDefault();
                 setActiveFilter("All");
                 setShownLimit(equipment.length);
-                showToast("SHOWING ALL EQUIPMENT");
+                showToast("SHOWING ALL 40 INSTRUMENTS");
               }}
             >
-              VIEW ALL EQUIPMENT ↗
+              VIEW ALL {equipment.length} INSTRUMENTS ↗
             </a>
           </div>
 
           {/* Department Filter Tabs & Sort Dropdown */}
           <div className="filter-row">
             <div className="filters">
-              {["All", "Electronics", "Robotics", "Computing", "Mechanical", "Chemistry", "Biotech"].map((f) => (
-                <button
-                  key={f}
-                  className={`filter ${activeFilter.toLowerCase() === f.toLowerCase() ? "active" : ""}`}
-                  onClick={() => {
-                    setActiveFilter(f);
-                    setShownLimit(8);
-                  }}
-                >
-                  {f === "All" ? "ALL GEAR" : f.toUpperCase()}
-                  {f === "All" && <small> {String(equipment.length).padStart(2, "0")}</small>}
-                </button>
-              ))}
+              {DEPARTMENTS.map((deptName) => {
+                const count = getDeptCount(deptName);
+                const isActive = activeFilter.toLowerCase() === deptName.toLowerCase();
+                return (
+                  <button
+                    key={deptName}
+                    className={`filter ${isActive ? "active" : ""}`}
+                    onClick={() => {
+                      setActiveFilter(deptName);
+                      setShownLimit(equipment.length);
+                    }}
+                  >
+                    {deptName === "All" ? "ALL GEAR" : deptName.toUpperCase()}{" "}
+                    <small>{String(count).padStart(2, "0")}</small>
+                  </button>
+                );
+              })}
             </div>
 
             <label className="sort-label">
@@ -373,7 +469,7 @@ export default function Home() {
             </label>
           </div>
 
-          {/* Product Grid */}
+          {/* Product Grid with all 40 items */}
           <div className="product-grid">
             {displayedEquipment.map((item, index) => {
               const isSaved = savedIds.includes(item.id);
@@ -384,11 +480,7 @@ export default function Home() {
                   onClick={() => setSelectedProduct(item)}
                 >
                   <div className="product-image">
-                    <img
-                      loading="lazy"
-                      src={item.imageUrl || "https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=900&q=85"}
-                      alt={item.name}
-                    />
+                    <EquipmentImage item={item} />
                     <span className="product-tag">
                       {item.tag || (item.trainingRequired ? "TRAINING REQUIRED" : "STUDENT FAVOURITE")}
                     </span>
@@ -411,7 +503,12 @@ export default function Home() {
 
                     <h3>{item.name}</h3>
                     <div className="product-spec">
-                      {item.spec || Object.entries(item.specs).slice(0, 2).map(([k, v]) => `${k}: ${v}`).join(" · ") || item.dept}
+                      {item.spec ||
+                        Object.entries(item.specs)
+                          .slice(0, 2)
+                          .map(([k, v]) => `${k}: ${v}`)
+                          .join(" · ") ||
+                        item.dept}
                     </div>
 
                     <div className="product-foot">
@@ -434,26 +531,27 @@ export default function Home() {
             {displayedEquipment.length < filteredEquipment.length && (
               <button
                 className="outline-btn"
-                onClick={() => setShownLimit(shownLimit + 8)}
+                onClick={() => setShownLimit(equipment.length)}
               >
-                LOAD MORE EQUIPMENT ↗
+                LOAD ALL {equipment.length} INSTRUMENTS ↗
               </button>
             )}
           </div>
         </section>
 
-        {/* DEPARTMENTS SECTION */}
+        {/* DEPARTMENTS SECTION 03 */}
         <section className="departments" id="departments">
           <div className="dept-heading section-pad">
             <div className="eyebrow light">
-              <b /> 03 — CHOOSE YOUR DIRECTION
+              <b /> 03 — 5 SPECIALIZED DEPARTMENTS
             </div>
             <h2>
-              WHAT ARE YOU
-              <br />
+              WHAT ARE YOU<br />
               <em>MAKING?</em>
             </h2>
-            <p>Start with your discipline. Find the gear to take it somewhere new.</p>
+            <p>
+              Start with your discipline. Find allocated gear across 5 engineering and science departments.
+            </p>
           </div>
 
           <div className="dept-grid">
@@ -462,62 +560,94 @@ export default function Home() {
               href="#catalog"
               onClick={() => {
                 setActiveFilter("Electronics");
-                setShownLimit(8);
+                setShownLimit(equipment.length);
               }}
             >
-              <span>01 / CIRCUITS & SIGNALS</span>
+              <span>01 / CIRCUITS & SILICON</span>
               <h3>
                 ELECTRONICS<span>+</span>
               </h3>
-              <b>EXPLORE GEAR ↗</b>
+              <b>EXPLORE {getDeptCount("Electronics")} INSTRUMENTS ↗</b>
             </a>
 
             <a
-              className="dept-card dept-robotics"
+              className="dept-card dept-mechanical"
               href="#catalog"
               onClick={() => {
-                setActiveFilter("Robotics");
-                setShownLimit(8);
+                setActiveFilter("Mechanical");
+                setShownLimit(equipment.length);
               }}
             >
-              <span>02 / MOTION & MACHINES</span>
+              <span>02 / MOTION & DYNAMICS</span>
               <h3>
-                ROBOTICS<span>+</span>
+                MECHANICAL<span>+</span>
               </h3>
-              <b>EXPLORE GEAR ↗</b>
+              <b>EXPLORE {getDeptCount("Mechanical")} INSTRUMENTS ↗</b>
             </a>
 
             <a
-              className="dept-card dept-computing"
+              className="dept-card dept-computerscience"
               href="#catalog"
               onClick={() => {
-                setActiveFilter("Computing");
-                setShownLimit(8);
+                setActiveFilter("Computer Science");
+                setShownLimit(equipment.length);
               }}
             >
               <span>03 / CODE & COMPUTE</span>
               <h3>
-                COMPUTING<span>+</span>
+                COMPUTER SCIENCE<span>+</span>
               </h3>
-              <b>EXPLORE GEAR ↗</b>
+              <b>EXPLORE {getDeptCount("Computer Science")} INSTRUMENTS ↗</b>
+            </a>
+
+            <a
+              className="dept-card dept-chemistry"
+              href="#catalog"
+              onClick={() => {
+                setActiveFilter("Chemistry");
+                setShownLimit(equipment.length);
+              }}
+            >
+              <span>04 / SYNTHESIS & ANALYSIS</span>
+              <h3>
+                CHEMISTRY<span>+</span>
+              </h3>
+              <b>EXPLORE {getDeptCount("Chemistry")} INSTRUMENTS ↗</b>
+            </a>
+
+            <a
+              className="dept-card dept-biotech"
+              href="#catalog"
+              onClick={() => {
+                setActiveFilter("Biotech");
+                setShownLimit(equipment.length);
+              }}
+            >
+              <span>05 / GENOMICS & ASSAYS</span>
+              <h3>
+                BIOTECH<span>+</span>
+              </h3>
+              <b>EXPLORE {getDeptCount("Biotech")} INSTRUMENTS ↗</b>
             </a>
           </div>
         </section>
 
-        {/* MANIFESTO SECTION */}
+        {/* MANIFESTO SECTION 04 */}
         <section className="manifesto section-pad" id="about">
           <div className="eyebrow">
-            <b /> 04 — MORE ACCESS. MORE MAKING.
+            <b /> 04 — FAIR ALLOCATION ALGORITHM
           </div>
           <div className="manifesto-grid">
             <h2>
-              LESS SEARCHING.
-              <br />
+              LESS SEARCHING.<br />
               <em>MORE DOING.</em>
             </h2>
             <div>
               <p>
-                Great projects shouldn't stall because the right equipment is out of reach. LabLink connects students with specialised campus resources through a smarter, simpler way to discover, request and book.
+                Great projects shouldn't stall because the right equipment is locked behind
+                departmental boundaries or monopolized by a single lab. LabLink connects students
+                with specialized campus resources through AI-driven matching and a fair,
+                faculty-approved allocation queue.
               </p>
               <a className="btn btn-dark" href="#how">
                 HOW LABLINK WORKS <span>↗</span>
@@ -526,34 +656,42 @@ export default function Home() {
           </div>
         </section>
 
-        {/* HOW IT WORKS SECTION */}
+        {/* HOW IT WORKS SECTION 05 */}
         <section className="how section-pad" id="how">
           <div className="eyebrow light">
             <b /> 05 — THE PROCESS
           </div>
           <h2>
-            THREE STEPS.
-            <br />
+            THREE STEPS.<br />
             <em>ONE LESS BARRIER.</em>
           </h2>
 
           <div className="steps">
             <article>
               <span>01</span>
-              <h3>DISCOVER</h3>
-              <p>Search across departments and find the equipment your project needs.</p>
+              <h3>DISCOVER & MATCH</h3>
+              <p>
+                Search across 5 departments. AI matching finds compatible instruments and verifies
+                required safety training certifications automatically.
+              </p>
             </article>
 
             <article>
               <span>02</span>
-              <h3>REQUEST</h3>
-              <p>Choose a time, tell us about your project and send an access request.</p>
+              <h3>AI PRIORITY REQUEST</h3>
+              <p>
+                Choose a time and submit your research proposal. Multi-factor scoring weighs deadlines,
+                research grant relevance, and fairness in real time.
+              </p>
             </article>
 
             <article>
               <span>03</span>
-              <h3>GET BUILDING</h3>
-              <p>Faculty review and approve via automated priority queue. You get access and build.</p>
+              <h3>FACULTY APPROVAL</h3>
+              <p>
+                Department chairs review calibrated scores in the faculty queue. Approved slots send
+                instant notifications so you can get building.
+              </p>
             </article>
           </div>
         </section>
@@ -565,19 +703,25 @@ export default function Home() {
           LAB<span>LINK</span>
           <sup>®</sup>
         </a>
-        <p>TOOLS FOR WHAT’S NEXT.</p>
+        <p>CROSS-DEPARTMENT CAMPUS LAB ALLOCATION PLATFORM.</p>
         <div>
-          <a href="#catalog">EQUIPMENT</a>
-          <a href="#departments">DEPARTMENTS</a>
+          <a href="#catalog">EQUIPMENT ({equipment.length})</a>
+          <a href="#departments">5 DEPARTMENTS</a>
           <a href="#how">HOW IT WORKS</a>
           <button
             onClick={() => setIsFacultyQueueOpen(true)}
-            style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", font: "inherit" }}
+            style={{
+              background: "none",
+              border: "none",
+              color: "inherit",
+              cursor: "pointer",
+              font: "inherit",
+            }}
           >
-            FACULTY QUEUE
+            FACULTY QUEUE ({pendingCount})
           </button>
         </div>
-        <small>© 2026 LABLINK · BUILT FOR CAMPUS INNOVATION</small>
+        <small>© 2026 LABLINK · BMSCE RESOURCE NETWORK · BUILT FOR CROSS-DISCIPLINARY INNOVATION</small>
       </footer>
 
       {/* SEARCH OVERLAY */}
@@ -592,12 +736,14 @@ export default function Home() {
           <b /> FIND YOUR NEXT TOOL
         </div>
         <input
-          placeholder="Try ‘oscilloscope’ or ‘robotics’..."
+          placeholder="Try ‘oscilloscope’, ‘biotech’, or ‘4090’..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           autoFocus={isSearchOpen}
         />
-        <p>SEARCH EQUIPMENT, CATEGORIES AND DEPARTMENTS ({filteredEquipment.length} RESULTS)</p>
+        <p>
+          SEARCH {equipment.length} INSTRUMENTS ACROSS 5 DEPARTMENTS ({filteredEquipment.length} MATCHES)
+        </p>
       </div>
 
       {/* MY KIT SLIDE-OUT DRAWER */}
@@ -628,10 +774,14 @@ export default function Home() {
               if (!p) return null;
               return (
                 <div key={id} className="saved-row">
-                  <img src={p.imageUrl} alt={p.name} />
+                  <div style={{ width: "76px", height: "76px", flexShrink: 0, overflow: "hidden" }}>
+                    <EquipmentImage item={p} />
+                  </div>
                   <div>
                     <h4>{p.name}</h4>
-                    <span className="product-spec">{p.dept} · {p.category}</span>
+                    <span className="product-spec">
+                      {p.dept} · {p.category}
+                    </span>
                     <br />
                     <button onClick={() => toggleSave(id)}>REMOVE</button>
                   </div>
@@ -667,19 +817,19 @@ export default function Home() {
             </button>
 
             <div className="modal-layout">
-              <div>
-                <img
-                  src={selectedProduct.imageUrl}
-                  alt={selectedProduct.name}
-                />
+              <div style={{ width: "100%", height: "390px", overflow: "hidden" }}>
+                <EquipmentImage item={selectedProduct} />
               </div>
 
               <div>
                 <div className="eyebrow">
-                  <b /> {selectedProduct.category.toUpperCase()} / {selectedProduct.model || selectedProduct.id.toUpperCase()}
+                  <b /> {selectedProduct.category.toUpperCase()} /{" "}
+                  {selectedProduct.model || selectedProduct.id.toUpperCase()}
                 </div>
                 <h2>{selectedProduct.name}</h2>
-                <div className="availability">{selectedProduct.status.toUpperCase()}</div>
+                <div className="availability">
+                  {selectedProduct.status.toUpperCase()}
+                </div>
                 <p>{selectedProduct.description}</p>
 
                 <div className="spec-list">
@@ -691,12 +841,20 @@ export default function Home() {
                   ))}
                   <div>
                     <span>LOCATION</span>
-                    <b>{selectedProduct.lab} · {selectedProduct.building}</b>
+                    <b>
+                      {selectedProduct.lab} · {selectedProduct.building}
+                    </b>
                   </div>
                   {selectedProduct.trainingRequired && (
                     <div>
                       <span>TRAINING REQUIRED</span>
-                      <b style={{ color: "#d7ff35", background: "#111", padding: "2px 6px" }}>
+                      <b
+                        style={{
+                          color: "#d7ff35",
+                          background: "#111",
+                          padding: "2px 6px",
+                        }}
+                      >
                         {selectedProduct.trainingRequired.toUpperCase()}
                       </b>
                     </div>
@@ -706,7 +864,7 @@ export default function Home() {
                 {/* Booking Form connected to working logic */}
                 <form className="booking-form" onSubmit={handleBookingSubmit}>
                   <div className="eyebrow">
-                    <b /> REQUEST ACCESS // FACULTY QUEUE
+                    <b /> REQUEST ACCESS // AI PRIORITY QUEUE
                   </div>
 
                   <label>PROJECT / COURSE TITLE</label>
@@ -749,10 +907,10 @@ export default function Home() {
                     <option>16:00 – 18:00</option>
                   </select>
 
-                  <label>WHY DO YOU NEED IT? (RESEARCH JUSTIFICATION)</label>
+                  <label>RESEARCH JUSTIFICATION</label>
                   <textarea
                     required
-                    placeholder="Briefly describe what you plan to build and why this specific instrument is needed..."
+                    placeholder="Describe how this cross-department instrument supports your project objectives..."
                     value={projectReason}
                     onChange={(e) => setProjectReason(e.target.value)}
                   />
@@ -803,7 +961,13 @@ export default function Home() {
                 </span>
                 <button
                   onClick={() => setShowWeightTuner(!showWeightTuner)}
-                  style={{ font: "10px 'DM Mono'", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}
+                  style={{
+                    font: "10px 'DM Mono'",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    textDecoration: "underline",
+                  }}
                 >
                   {showWeightTuner ? "HIDE SLIDERS" : "ADJUST WEIGHTS"}
                 </button>
