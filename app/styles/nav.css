@@ -1,0 +1,127 @@
+.header {
+  height: 78px;
+  background: #111310;
+  color: white;
+  display: flex;
+  align-items: center;
+  padding: 0 5.2%;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  border-bottom: 1px solid #343730;
+}
+
+.logo {
+  font-size: 25px;
+  font-weight: 800;
+  letter-spacing: -1.8px;
+}
+
+.logo span {
+  font-weight: 400;
+}
+
+.logo sup {
+  font: 9px 'DM Mono', monospace;
+  vertical-align: top;
+  margin-left: 3px;
+  color: var(--lime);
+}
+
+.nav {
+  display: flex;
+  gap: 32px;
+  margin-left: 5%;
+  font: 10px 'DM Mono', monospace;
+  letter-spacing: .08em;
+}
+
+.nav a,
+.nav button {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  transition: color .2s;
+  padding: 0;
+}
+
+.nav a:hover,
+.nav button:hover,
+.head-actions button:hover {
+  color: var(--lime);
+}
+
+.nav i {
+  font-style: normal;
+  color: var(--lime);
+}
+
+.head-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.icon-btn,
+.menu-btn {
+  border: 0;
+  background: none;
+  color: white;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.garage-btn {
+  background: transparent;
+  color: white;
+  border: 1px solid #55594f;
+  padding: 10px 14px;
+  font: 10px 'DM Mono', monospace;
+  letter-spacing: .07em;
+  cursor: pointer;
+  transition: border-color .2s;
+}
+
+.garage-btn:hover {
+  border-color: var(--lime);
+}
+
+.garage-btn span {
+  background: var(--lime);
+  color: #111;
+  padding: 2px 6px;
+  margin-left: 6px;
+  font-weight: bold;
+}
+
+.queue-pill-btn {
+  background: #20251f;
+  color: var(--lime);
+  border: 1px solid #3d4538;
+  padding: 10px 14px;
+  font: 10px 'DM Mono', monospace;
+  letter-spacing: .07em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all .2s;
+}
+
+.queue-pill-btn:hover {
+  border-color: var(--lime);
+  background: #2a3028;
+}
+
+.queue-pill-btn span.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--lime);
+}
+
+.menu-btn {
+  display: none;
+}

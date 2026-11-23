@@ -1,0 +1,100 @@
+.manifesto {
+  background: var(--lime);
+  color: #111;
+}
+
+.manifesto .eyebrow b {
+  background: #111;
+}
+
+.manifesto-grid {
+  display: grid;
+  grid-template-columns: 1.2fr .8fr;
+  gap: 9%;
+  align-items: end;
+  margin-top: 50px;
+}
+
+.manifesto h2 em {
+  color: #111;
+}
+
+.manifesto-grid p {
+  color: #30352a;
+  margin: 0 0 28px;
+}
+
+.how {
+  background: #171a16;
+  color: white;
+}
+
+.how h2 {
+  margin: 30px 0 65px;
+}
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid #4b5047;
+}
+
+.steps article {
+  padding: 25px 30px 15px 0;
+  border-right: 1px solid #4b5047;
+  margin-right: 30px;
+}
+
+.steps article:last-child {
+  border: 0;
+}
+
+.steps article>span {
+  font: 11px 'DM Mono', monospace;
+  color: var(--lime);
+}
+
+.steps h3 {
+  font-size: 22px;
+  letter-spacing: -.04em;
+  margin: 45px 0 12px;
+  color: white;
+}
+
+.steps p {
+  font-size: 12px;
+  line-height: 1.8;
+  color: #aeb3a7;
+  max-width: 260px;
+}
+
+footer {
+  background: #0d0f0d;
+  color: white;
+  padding: 55px 9% 28px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 2fr;
+  align-items: center;
+  gap: 20px;
+}
+
+footer p,
+footer small,
+footer div {
+  font: 9px 'DM Mono', monospace;
+  letter-spacing: .08em;
+  color: #9da296;
+}
+
+footer div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 25px;
+}
+
+footer small {
+  grid-column: 1/-1;
+  border-top: 1px solid #383d35;
+  padding-top: 22px;
+  margin-top: 25px;
+}
