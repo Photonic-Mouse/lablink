@@ -84,6 +84,10 @@ export interface Notification {
   text: string;
   at: string;
   read: boolean;
+  type?: "booking" | "availability" | "training" | "system";
+  link?: string;
+  actionLabel?: string;
+  actionBookingId?: string;
 }
 
 export const defaultWeights: Weights = {

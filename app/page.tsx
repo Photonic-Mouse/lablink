@@ -16,6 +16,9 @@ import {
   notifyBookingSubmitted,
   notifyBookingApproved,
   notifyBookingRejected,
+  notifyAvailabilityFreed,
+  getUserNotifications,
+  markNotificationAsRead,
 } from "@/lib/notifications";
 import { generateProjectRecommendations, EquipmentRecommendation, ProjectExtractionResult } from "@/lib/mockLLM";
 
@@ -92,6 +95,10 @@ export default function Home() {
   const [kitQuantities, setKitQuantities] = useState<Record<string, number>>({});
   const [selectedProduct, setSelectedProduct] = useState<Equipment | null>(null);
   const [isKitBookingOpen, setIsKitBookingOpen] = useState(false);
+  const [isOrdersOpen, setIsOrdersOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [notificationVersion, setNotificationVersion] = useState(0);
+  const [demoEquipmentId, setDemoEquipmentId] = useState(equipment[0]?.id || "");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isFacultyQueueOpen, setIsFacultyQueueOpen] = useState(false);
@@ -124,6 +131,25 @@ export default function Home() {
     certs: ["oscilloscope-basics", "3d-printer-safety"],
     usageHoursLast30d: 6,
     noShows: 0,
+  };
+
+  const refreshLiveData = () => setNotificationVersion((version) => version + 1);
+  const triggerAvailabilityEvent = (equipmentId: string, event: "cancelled" | "rejected" | "finished" | "maintenance-cleared") => {
+    const savedStudentIds = savedIds.includes(equipmentId) ? [currentStudent.id] : [];
+    const result = notifyAvailabilityFreed(equipmentId, event, savedStudentIds);
+    setBookings([...db.bookings]);
+    refreshLiveData();
+    const item = equipment.find((entry) => entry.id === equipmentId);
+    showToast(result.promoted ? `${item?.name || "Item"} promoted the next waitlisted student` : `${item?.name || "Item"} availability notifications sent`);
+  };
+
+  const toggleDemoMaintenance = () => {
+    const item = db.equipment.find((entry) => entry.id === demoEquipmentId);
+    if (!item) return;
+    const wasMaintenance = item.status === "maintenance";
+    item.status = wasMaintenance ? "available" : "maintenance";
+    if (wasMaintenance) triggerAvailabilityEvent(item.id, "maintenance-cleared");
+    else { refreshLiveData(); showToast(`${item.name} marked for maintenance`); }
   };
 
   // Live call to /api/search for natural language queries
@@ -403,6 +429,7 @@ export default function Home() {
     });
     setBookings(updated);
     db.bookings = updated;
+    updated.find((booking) => booking.id === id)?.equipmentIds.forEach((equipmentId) => triggerAvailabilityEvent(equipmentId, "rejected"));
     showToast("BOOKING REJECTED");
   };
 
@@ -448,6 +475,9 @@ export default function Home() {
     <button onClick={() => handleRejectQueue(id)}>REJECT</button>
     <button onClick={() => handleOverrideQueue(id)}>OVERRIDE</button>
   </div>;
+  const myNotifications = getUserNotifications(currentStudent.id);
+  const unreadNotificationCount = myNotifications.filter((notification) => !notification.read).length;
+  const myOrders = bookings.filter((booking) => booking.studentId === currentStudent.id);
 
   return (
     <>
@@ -490,6 +520,12 @@ export default function Home() {
             <span>QUEUE {pendingCount > 0 ? `(${pendingCount})` : ""}</span>
           </button>
 
+          <button className="icon-btn notification-btn" onClick={() => setIsNotificationsOpen(!isNotificationsOpen)} aria-label="Open notifications">
+            ♢{unreadNotificationCount > 0 && <span className="notification-count">{unreadNotificationCount}</span>}
+          </button>
+
+          <button className="orders-btn" onClick={() => setIsOrdersOpen(true)}>MY ORDERS</button>
+
           <button
             className="icon-btn"
             onClick={() => setIsSearchOpen(true)}
@@ -514,6 +550,14 @@ export default function Home() {
           </button>
         </div>
       </header>
+
+      {isNotificationsOpen && <div className="notification-panel">
+        <div className="notification-panel-heading"><span>NOTIFICATIONS</span><button onClick={() => setIsNotificationsOpen(false)}>×</button></div>
+        {myNotifications.length === 0 ? <p className="notification-empty">You’re all caught up.</p> : myNotifications.map((notification) => <div className={`notification-item ${notification.read ? "read" : ""}`} key={notification.id} onClick={() => { markNotificationAsRead(notification.id); refreshLiveData(); }}>
+          <p>{notification.text}</p><small>{new Date(notification.at).toLocaleString()}</small>
+          {notification.actionBookingId && <button onClick={(event) => { event.stopPropagation(); markNotificationAsRead(notification.id); refreshLiveData(); setIsOrdersOpen(true); }}>CONFIRM</button>}
+        </div>)}
+      </div>}
 
       {/* Main Content */}
       <main id="top">
@@ -1040,6 +1084,19 @@ export default function Home() {
         <a className="text-link kit-keep-exploring" href="#catalog" onClick={() => setIsDrawerOpen(false)}>KEEP EXPLORING ↗</a>
       </aside>
 
+      {isOrdersOpen && <div className="orders-backdrop" onClick={() => setIsOrdersOpen(false)}>
+        <aside className="orders-panel" onClick={(event) => event.stopPropagation()}>
+          <button className="close" onClick={() => setIsOrdersOpen(false)}>×</button>
+          <div className="eyebrow"><b /> YOUR BOOKINGS</div>
+          <h2>MY <em>ORDERS.</em></h2>
+          {myOrders.length === 0 ? <p className="muted">Your booking requests will appear here.</p> : <div className="orders-list">{myOrders.map((order) => <div className="order-row" key={order.id}>
+            <div><strong>{order.equipmentNames?.join(" · ") || order.equipmentIds.join(" · ")}</strong><span>{order.projectTitle}</span><small>{order.slotStart} · score {order.score || "pending"}</small></div>
+            <b className={`order-status ${order.status}`}>{order.status.toUpperCase()}</b>
+            {order.status === "approved" && order.decidedBy === "Availability Queue Balancer" && <button onClick={() => showToast("BOOKING CONFIRMED · SEE YOU IN THE LAB")}>CONFIRM</button>}
+          </div>)}</div>}
+        </aside>
+      </div>}
+
       <div className={`modal-backdrop ${isKitBookingOpen ? "open" : ""}`} onClick={(e) => { if (e.target === e.currentTarget) setIsKitBookingOpen(false); }}>
         {isKitBookingOpen && <div className="modal kit-booking-modal">
           <button className="close" onClick={() => setIsKitBookingOpen(false)}>×</button>
@@ -1287,6 +1344,15 @@ export default function Home() {
               <p style={{ color: "#62665c", fontSize: "13px", margin: 0 }}>
                 Review, approve, and calibrate multi-factor priority scores for student research equipment requests.
               </p>
+            </div>
+
+            <div className="availability-demo-controls">
+              <span>AVAILABILITY DEMO</span>
+              <select value={demoEquipmentId} onChange={(e) => setDemoEquipmentId(e.target.value)} aria-label="Demo equipment">
+                {equipment.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}
+              </select>
+              <button onClick={() => triggerAvailabilityEvent(demoEquipmentId, "cancelled")}>SIMULATE CANCELLATION</button>
+              <button onClick={toggleDemoMaintenance}>{db.equipment.find((item) => item.id === demoEquipmentId)?.status === "maintenance" ? "CLEAR MAINTENANCE" : "SET MAINTENANCE"}</button>
             </div>
 
             {/* Quick Weight Tuner */}
