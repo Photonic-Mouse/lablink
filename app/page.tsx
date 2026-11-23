@@ -202,6 +202,8 @@ export default function Home() {
     initialBookings[0]?.id || ""
   );
   const [showWeightTuner, setShowWeightTuner] = useState(false);
+  const [queueView, setQueueView] = useState<"item" | "person">("item");
+  const [queueSearch, setQueueSearch] = useState("");
 
   // Booking Form state in modal
   const [projectTitle, setProjectTitle] = useState("");
@@ -413,12 +415,39 @@ export default function Home() {
     showToast("CANDIDATE PLACED ON WAITLIST");
   };
 
+  const handleOverrideQueue = (id: string) => {
+    const updated = bookings.map((b) => b.id === id ? { ...b, status: "approved" as const, decidedBy: "Faculty Override", overrideNote: "Approved by faculty override." } : b);
+    setBookings(updated);
+    db.bookings = updated;
+    showToast("FACULTY OVERRIDE APPLIED");
+  };
+
   const activeQueueReq = bookings.find((b) => b.id === selectedQueueReqId) || bookings[0];
   const pendingCount = bookings.filter((b) => b.status === "pending").length;
   const kitItems = savedIds.map((id) => equipment.find((item) => item.id === id)).filter((item): item is Equipment => Boolean(item));
   const kitItemCount = kitItems.reduce((total, item) => total + (kitQuantities[item.id] || 1), 0);
   const kitTraining = Array.from(new Set(kitItems.map((item) => item.trainingRequired).filter((value): value is string => Boolean(value))));
   const kitMaintenance = kitItems.filter((item) => item.status === "maintenance");
+  const normalizedQueueSearch = queueSearch.trim().toLowerCase();
+  const queueMatches = bookings.filter((req) => {
+    if (!normalizedQueueSearch) return true;
+    const names = req.equipmentNames?.join(" ") || req.equipmentIds.join(" ");
+    return `${req.studentName || ""} ${req.studentDept || ""} ${names} ${req.projectTitle}`.toLowerCase().includes(normalizedQueueSearch);
+  });
+  const queueItemGroups = Array.from(new Set(queueMatches.flatMap((req) => req.equipmentIds))).map((equipmentId) => ({
+    equipment: equipment.find((item) => item.id === equipmentId),
+    requests: queueMatches.filter((req) => req.equipmentIds.includes(equipmentId)).sort((a, b) => (b.score || 0) - (a.score || 0)),
+  })).filter((group): group is { equipment: Equipment; requests: BookingRequest[] } => Boolean(group.equipment));
+  const queuePersonGroups = Array.from(new Set(queueMatches.map((req) => req.studentId))).map((studentId) => ({
+    student: db.students.find((student) => student.id === studentId),
+    requests: queueMatches.filter((req) => req.studentId === studentId).sort((a, b) => (b.score || 0) - (a.score || 0)),
+  })).filter((group) => Boolean(group.student));
+  const renderQueueActions = (id: string) => <div className="queue-row-actions">
+    <button onClick={() => handleApproveQueue(id)}>APPROVE</button>
+    <button onClick={() => handleWaitlistQueue(id)}>WAITLIST</button>
+    <button onClick={() => handleRejectQueue(id)}>REJECT</button>
+    <button onClick={() => handleOverrideQueue(id)}>OVERRIDE</button>
+  </div>;
 
   return (
     <>
@@ -1313,50 +1342,36 @@ export default function Home() {
               )}
             </div>
 
+            <div className="queue-toolbar">
+              <div className="queue-toggle" role="tablist" aria-label="Queue grouping">
+                <button className={queueView === "item" ? "active" : ""} onClick={() => setQueueView("item")} role="tab" aria-selected={queueView === "item"}>BY ITEM</button>
+                <button className={queueView === "person" ? "active" : ""} onClick={() => setQueueView("person")} role="tab" aria-selected={queueView === "person"}>BY PERSON</button>
+              </div>
+              <input className="queue-search" value={queueSearch} onChange={(e) => setQueueSearch(e.target.value)} placeholder={queueView === "item" ? "Search equipment, lab, or student..." : "Search student or equipment..."} aria-label="Filter faculty queue" />
+            </div>
+
             {/* Queue Split View */}
             <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1.8fr", gap: "25px", marginTop: "20px" }}>
-              {/* Left Column: Candidates List */}
-              <div style={{ borderRight: "1px solid var(--line)", paddingRight: "15px", maxHeight: "420px", overflowY: "auto" }}>
-                <span style={{ font: "9px 'DM Mono'", color: "#777", display: "block", marginBottom: "10px" }}>
-                  CANDIDATES IN QUEUE ({bookings.length})
-                </span>
-
-                {bookings.map((req, idx) => (
-                  <div
-                    key={req.id}
-                    onClick={() => setSelectedQueueReqId(req.id)}
-                    style={{
-                      padding: "12px",
-                      background: activeQueueReq?.id === req.id ? "white" : "transparent",
-                      border: "1px solid",
-                      borderColor: activeQueueReq?.id === req.id ? "#111" : "transparent",
-                      marginBottom: "8px",
-                      cursor: "pointer",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <div>
-                      <div style={{ font: "8px 'DM Mono'", color: "#8da62b", fontWeight: "bold" }}>
-                        #{idx + 1} // {req.projectType.toUpperCase()}
-                      </div>
-                      <strong style={{ fontSize: "13px", display: "block" }}>{req.studentName}</strong>
-                      <span style={{ fontSize: "10px", color: "#666" }}>
-                        {req.equipmentNames?.[0] || req.equipmentIds[0]}
-                      </span>
-                    </div>
-
-                    <div style={{ textAlign: "right" }}>
-                      <span style={{ font: "18px 'DM Mono'", fontWeight: "800", color: "#111" }}>
-                        {req.score || 85}
-                      </span>
-                      <span style={{ font: "8px 'DM Mono'", display: "block", color: "#777" }}>
-                        {req.status.toUpperCase()}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+              {/* Left Column: Grouped Queue */}
+              <div className="queue-groups-column">
+                <span className="queue-column-label">{queueView === "item" ? "EQUIPMENT GROUPS" : "STUDENT GROUPS"} ({queueView === "item" ? queueItemGroups.length : queuePersonGroups.length})</span>
+                {queueView === "item" ? queueItemGroups.map(({ equipment: item, requests }) => <div className="queue-group" key={item.id}>
+                  <div className="queue-group-header"><div><strong>{item.name}</strong><span>{item.lab} · {item.status.toUpperCase()} · OWNER {item.ownerFacultyId}</span></div><b>{requests.length}</b></div>
+                  {requests.map((req, index) => <div className={`queue-group-request ${activeQueueReq?.id === req.id ? "selected" : ""}`} key={req.id} onClick={() => setSelectedQueueReqId(req.id)}>
+                    <div className="queue-request-top"><span>#{index + 1} · {req.studentName}</span><strong>{req.score || 0}</strong></div>
+                    <div className="queue-request-meta"><span>{req.projectTitle}</span><em>{req.status.toUpperCase()}</em>{requests.length > 1 && <i>CONFLICT</i>}</div>
+                    <div className="score-bar-bg"><div className="score-bar-fill" style={{ width: `${req.score || 0}%` }} /></div>
+                    {renderQueueActions(req.id)}
+                  </div>)}
+                </div>) : queuePersonGroups.map(({ student, requests }) => <div className="queue-group" key={student?.id}>
+                  <div className="queue-group-header"><div><strong>{student?.name}</strong><span>{student?.dept} · {student?.usageHoursLast30d}h / 30D · {student?.certs.length || 0} CERTS · {student?.noShows || 0} NO-SHOWS</span></div><b>{requests.length}</b></div>
+                  {requests.map((req) => <div className={`queue-group-request ${activeQueueReq?.id === req.id ? "selected" : ""}`} key={req.id} onClick={() => setSelectedQueueReqId(req.id)}>
+                    <div className="queue-request-top"><span>{req.projectTitle}</span><strong>{req.score || 0}</strong></div>
+                    <div className="queue-request-meta"><span>{req.equipmentNames?.join(" · ") || req.equipmentIds.join(" · ")}</span><em>{req.status.toUpperCase()}</em></div>
+                    <div className="score-bar-bg"><div className="score-bar-fill" style={{ width: `${req.score || 0}%` }} /></div>
+                  </div>)}
+                </div>)}
+                {((queueView === "item" && queueItemGroups.length === 0) || (queueView === "person" && queuePersonGroups.length === 0)) && <p className="queue-empty">No queue entries match “{queueSearch}”.</p>}
               </div>
 
               {/* Right Column: Detailed Score Bars & Actions */}
@@ -1486,6 +1501,12 @@ export default function Home() {
                       style={{ padding: "8px 16px", font: "9px 'DM Mono'", background: "var(--lime)", color: "#111", border: "none", fontWeight: "bold", cursor: "pointer" }}
                     >
                       APPROVE ACCESS ↗
+                    </button>
+                    <button
+                      onClick={() => handleOverrideQueue(activeQueueReq.id)}
+                      style={{ padding: "8px 14px", font: "9px 'DM Mono'", background: "#111", color: "#fff", border: "none", cursor: "pointer" }}
+                    >
+                      OVERRIDE
                     </button>
                   </div>
                 </div>
