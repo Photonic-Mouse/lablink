@@ -20,6 +20,7 @@ async function extractWithGemini(description: string): Promise<ProjectExtraction
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+    signal: AbortSignal.timeout(12000),
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: `You are a university lab equipment planner. Return only equipment from this catalogue. Analyze the project and recommend the smallest useful kit. Project:\n${description}\n\nCatalogue:\n${JSON.stringify(catalogue)}` }] }],
       generationConfig: {
