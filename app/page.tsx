@@ -89,7 +89,9 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("featured");
   const [savedIds, setSavedIds] = useState<string[]>([]);
+  const [kitQuantities, setKitQuantities] = useState<Record<string, number>>({});
   const [selectedProduct, setSelectedProduct] = useState<Equipment | null>(null);
+  const [isKitBookingOpen, setIsKitBookingOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isFacultyQueueOpen, setIsFacultyQueueOpen] = useState(false);
@@ -179,8 +181,12 @@ export default function Home() {
 
   const addAutoItemsToKit = (ids: string[]) => {
     const nextIds = Array.from(new Set([...savedIds, ...ids]));
+    const nextQuantities = { ...kitQuantities };
+    ids.forEach((id) => { nextQuantities[id] = nextQuantities[id] || 1; });
     setSavedIds(nextIds);
+    setKitQuantities(nextQuantities);
     try { localStorage.setItem("lablinkSaved", JSON.stringify(nextIds)); } catch {}
+    try { localStorage.setItem("lablinkKitQuantities", JSON.stringify(nextQuantities)); } catch {}
     showToast(`${ids.length} ITEM${ids.length === 1 ? "" : "S"} ADDED TO YOUR KIT`);
   };
 
@@ -209,7 +215,13 @@ export default function Home() {
   useEffect(() => {
     try {
       const stored = localStorage.getItem("lablinkSaved");
-      if (stored) setSavedIds(JSON.parse(stored));
+      const storedQuantities = localStorage.getItem("lablinkKitQuantities");
+      if (stored) {
+        const ids = JSON.parse(stored) as string[];
+        setSavedIds(ids);
+        const parsed = storedQuantities ? JSON.parse(storedQuantities) : {};
+        setKitQuantities(Object.fromEntries(ids.map((id) => [id, Number(parsed[id]) > 0 ? Number(parsed[id]) : 1])));
+      }
     } catch {}
   }, []);
 
@@ -229,9 +241,21 @@ export default function Home() {
       showToast("ADDED TO YOUR KIT");
     }
     setSavedIds(updated);
+    const updatedQuantities = { ...kitQuantities };
+    if (savedIds.includes(id)) delete updatedQuantities[id];
+    else updatedQuantities[id] = updatedQuantities[id] || 1;
+    setKitQuantities(updatedQuantities);
     try {
       localStorage.setItem("lablinkSaved", JSON.stringify(updated));
+      localStorage.setItem("lablinkKitQuantities", JSON.stringify(updatedQuantities));
     } catch {}
+  };
+
+  const updateKitQuantity = (id: string, delta: number) => {
+    const nextQuantity = Math.max(1, (kitQuantities[id] || 1) + delta);
+    const nextQuantities = { ...kitQuantities, [id]: nextQuantity };
+    setKitQuantities(nextQuantities);
+    try { localStorage.setItem("lablinkKitQuantities", JSON.stringify(nextQuantities)); } catch {}
   };
 
   // Helper count for real department stats
@@ -268,20 +292,26 @@ export default function Home() {
   // Handle Booking Submission with safety validation and automated multi-factor scoring
   const handleBookingSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedProduct) return;
+    if (!selectedProduct && !isKitBookingOpen) return;
+
+    const bookingItems = selectedProduct
+      ? [{ item: selectedProduct, quantity: 1 }]
+      : savedIds.map((id) => ({ item: equipment.find((entry) => entry.id === id), quantity: kitQuantities[id] || 1 })).filter((entry): entry is { item: Equipment; quantity: number } => Boolean(entry.item));
+    if (!bookingItems.length) return;
 
     // Check maintenance status
-    if (selectedProduct.status === "maintenance") {
-      showToast(`BOOKING BLOCKED: ${selectedProduct.name} is currently under maintenance.`);
+    const maintenanceItem = bookingItems.find(({ item }) => item.status === "maintenance");
+    if (maintenanceItem) {
+      showToast(`BOOKING BLOCKED: ${maintenanceItem.item.name} is currently under maintenance.`);
       return;
     }
 
     // Check training safety certification
-    const isCertified = hasRequiredTraining(currentStudent, selectedProduct);
-    if (!isCertified && selectedProduct.trainingRequired) {
-      const mod = getRequiredTrainingModule(selectedProduct);
+    const trainingItem = bookingItems.find(({ item }) => item.trainingRequired && !hasRequiredTraining(currentStudent, item));
+    if (trainingItem) {
+      const mod = getRequiredTrainingModule(trainingItem.item);
       showToast(
-        `BOOKING BLOCKED: Missing certification "${mod?.name || selectedProduct.trainingRequired}". Complete prerequisite training before reserving.`
+        `BOOKING BLOCKED: Missing certification "${mod?.name || trainingItem.item.trainingRequired}". Complete prerequisite training before reserving.`
       );
       return;
     }
@@ -319,8 +349,8 @@ export default function Home() {
       studentName: currentStudent.name,
       studentDept: currentStudent.dept,
       studentYear: currentStudent.year,
-      equipmentIds: [selectedProduct.id],
-      equipmentNames: [selectedProduct.name],
+      equipmentIds: bookingItems.flatMap(({ item, quantity }) => Array.from({ length: quantity }, () => item.id)),
+      equipmentNames: bookingItems.map(({ item, quantity }) => `${item.name} ×${quantity}`),
       slotStart: `${preferredDate} ${preferredSlot.split(" – ")[0]}`,
       slotEnd: `${preferredDate} ${preferredSlot.split(" – ")[1] || "13:00"}`,
       projectTitle: projectTitle || "Cross-Department Research Prototyping",
@@ -339,6 +369,7 @@ export default function Home() {
     notifyBookingSubmitted(newBooking);
 
     setSelectedProduct(null);
+    setIsKitBookingOpen(false);
     setProjectTitle("");
     setProjectReason("");
     showToast(`REQUEST SUBMITTED · PRIORITY SCORE: ${score}/100 · ADDED TO FACULTY QUEUE`);
@@ -384,6 +415,10 @@ export default function Home() {
 
   const activeQueueReq = bookings.find((b) => b.id === selectedQueueReqId) || bookings[0];
   const pendingCount = bookings.filter((b) => b.status === "pending").length;
+  const kitItems = savedIds.map((id) => equipment.find((item) => item.id === id)).filter((item): item is Equipment => Boolean(item));
+  const kitItemCount = kitItems.reduce((total, item) => total + (kitQuantities[item.id] || 1), 0);
+  const kitTraining = Array.from(new Set(kitItems.map((item) => item.trainingRequired).filter((value): value is string => Boolean(value))));
+  const kitMaintenance = kitItems.filter((item) => item.status === "maintenance");
 
   return (
     <>
@@ -438,7 +473,7 @@ export default function Home() {
             className="garage-btn"
             onClick={() => setIsDrawerOpen(true)}
           >
-            MY KIT <span>{savedIds.length}</span>
+            MY KIT <span>{kitItemCount}</span>
           </button>
 
           <button
@@ -851,16 +886,20 @@ export default function Home() {
         {isExtracting && <p>Reading your project and matching instruments across the campus catalogue…</p>}
         {!isExtracting && projectDescription && autoSearchResults.length === 0 && <p>We couldn’t find a confident match yet. Try adding a method, material, or instrument type.</p>}
         {(extractedSkills.length > 0 || requiredCertifications.length > 0) && <div className="search-match-reason"><strong>EXTRACTED SKILLS:</strong> {extractedSkills.join(" · ")}<br /><strong>TRAINING:</strong> {requiredCertifications.length ? requiredCertifications.join(" · ") : "No additional certification detected"}</div>}
-        {autoSearchResults.length > 0 && <div className="search-results">
-          {autoSearchResults.map(({ equipment: item, reason, estimatedHours, quantity }) => <div className="search-result-item" key={item.id}>
-            <input type="checkbox" checked={selectedAutoIds.includes(item.id)} onChange={() => setSelectedAutoIds((ids) => ids.includes(item.id) ? ids.filter((id) => id !== item.id) : [...ids, item.id])} />
-            <span style={{ fontSize: "24px" }}>{item.imageEmoji}</span>
-            <div style={{ flex: 1 }}><h4>{item.name}</h4><p>{reason}</p><small>{estimatedHours} estimated hours · quantity {quantity}</small></div>
-            <button className="close" onClick={() => { setAutoSearchResults((items) => items.filter(({ equipment: current }) => current.id !== item.id)); setSelectedAutoIds((ids) => ids.filter((id) => id !== item.id)); }}>×</button>
+        {autoSearchResults.length > 0 && <div className="auto-cart-list">
+          {autoSearchResults.map(({ equipment: item, estimatedHours, quantity }, index) => <div className="auto-cart-row" key={item.id}>
+            <span className="auto-cart-index">{String(index + 1).padStart(2, "0")}</span>
+            <input className="auto-cart-check" type="checkbox" checked={selectedAutoIds.includes(item.id)} onChange={() => setSelectedAutoIds((ids) => ids.includes(item.id) ? ids.filter((id) => id !== item.id) : [...ids, item.id])} aria-label={`Select ${item.name}`} />
+            <span className="auto-cart-emoji">{item.imageEmoji}</span>
+            <div className="auto-cart-details"><strong>{item.name}</strong><span>{item.dept} · {item.category}</span></div>
+            <div className="auto-cart-meta"><span>{estimatedHours} hrs</span><span>Qty {quantity}</span></div>
+            <button className="auto-cart-remove" onClick={() => { setAutoSearchResults((items) => items.filter(({ equipment: current }) => current.id !== item.id)); setSelectedAutoIds((ids) => ids.filter((id) => id !== item.id)); }} aria-label={`Remove ${item.name}`}>×</button>
           </div>)}
         </div>}
-        <input value={autoItemQuery} onChange={(e) => setAutoItemQuery(e.target.value)} placeholder="Add more items — search the catalogue..." />
-        {autoItemResults.map(({ equipment: item }) => <button key={item.id} className="search-result-item" onClick={() => { if (!autoSearchResults.some(({ equipment: current }) => current.id === item.id)) { setAutoSearchResults((items) => [...items, { equipment: item, reason: "Added from your catalogue search.", estimatedHours: 4, quantity: 1 }]); setSelectedAutoIds((ids) => [...ids, item.id]); } setAutoItemQuery(""); }}>{item.imageEmoji} {item.name}</button>)}
+        <div className="auto-add-more">
+          <span>+</span><input value={autoItemQuery} onChange={(e) => setAutoItemQuery(e.target.value)} placeholder="Add more items from the catalogue" />
+        </div>
+        {autoItemResults.length > 0 && <div className="auto-add-results">{autoItemResults.slice(0, 5).map(({ equipment: item }) => <button key={item.id} className="auto-add-result" onClick={() => { if (!autoSearchResults.some(({ equipment: current }) => current.id === item.id)) { setAutoSearchResults((items) => [...items, { equipment: item, reason: "", estimatedHours: 4, quantity: 1 }]); setSelectedAutoIds((ids) => [...ids, item.id]); } setAutoItemQuery(""); }}>{item.imageEmoji} <span>{item.name}</span><small>ADD</small></button>)}</div>}
         <div className="hero-ctas">
           <button className="btn btn-lime" onClick={() => addAutoItemsToKit(autoSearchResults.map(({ equipment: item }) => item.id))}>ADD EVERYTHING TO KIT</button>
           <button className="btn btn-dark" onClick={() => addAutoItemsToKit(selectedAutoIds)}>ADD SELECTED TO KIT</button>
@@ -945,47 +984,56 @@ export default function Home() {
         >
           ×
         </button>
-        <div className="eyebrow">
-          <b /> YOUR SHORTLIST
+        <div className="eyebrow"><b /> YOUR SHORTLIST</div>
+        <h2>MY <em>KIT.</em></h2>
+        <div className="kit-card">
+          <div className="kit-gallery">
+            {kitItems.length === 0 ? <p className="muted">Your saved equipment will show up here.</p> : kitItems.map((item) => <button className="kit-gallery-item" key={item.id} onClick={() => setSelectedProduct(item)}>
+              <div className="kit-gallery-image"><EquipmentImage item={item} /></div>
+              <span>{item.name}</span>
+            </button>)}
+          </div>
+          <div className="kit-receipt">
+            <div className="kit-receipt-heading"><span>LABLINK KIT</span><span>{kitItems.length} LINES</span></div>
+            <div className="kit-receipt-list">
+              {kitItems.map((item) => <div className="kit-receipt-row" key={item.id}>
+                <div className="kit-receipt-name"><span>{item.name}</span><i /></div>
+                <div className="kit-stepper"><button onClick={() => updateKitQuantity(item.id, -1)} aria-label={`Decrease ${item.name}`}>−</button><b>{kitQuantities[item.id] || 1}</b><button onClick={() => updateKitQuantity(item.id, 1)} aria-label={`Increase ${item.name}`}>+</button></div>
+                <button className="kit-remove" onClick={() => toggleSave(item.id)} aria-label={`Remove ${item.name}`}>×</button>
+              </div>)}
+            </div>
+            <div className="kit-total"><span>TOTAL ITEMS</span><strong>{kitItemCount}</strong></div>
+            {kitTraining.length > 0 && <div className="kit-notice"><b>TRAINING REQUIRED</b><span>{kitTraining.join(" · ")}</span></div>}
+            {kitMaintenance.length > 0 && <div className="kit-notice warning"><b>MAINTENANCE WARNING</b><span>{kitMaintenance.map((item) => item.name).join(" · ")} unavailable</span></div>}
+            <button className="btn btn-dark full" disabled={kitItems.length === 0} onClick={() => setIsKitBookingOpen(true)}>REQUEST ALL ↗</button>
+          </div>
         </div>
-        <h2>
-          MY <em>KIT.</em>
-        </h2>
-
-        <div className="saved-items">
-          {savedIds.length === 0 ? (
-            <p className="muted">Your saved equipment will show up here.</p>
-          ) : (
-            savedIds.map((id) => {
-              const p = equipment.find((x) => x.id === id);
-              if (!p) return null;
-              return (
-                <div key={id} className="saved-row">
-                  <div style={{ width: "76px", height: "76px", flexShrink: 0, overflow: "hidden" }}>
-                    <EquipmentImage item={p} />
-                  </div>
-                  <div>
-                    <h4>{p.name}</h4>
-                    <span className="product-spec">
-                      {p.dept} · {p.category}
-                    </span>
-                    <br />
-                    <button onClick={() => toggleSave(id)}>REMOVE</button>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-
-        <a
-          className="btn btn-dark full"
-          href="#catalog"
-          onClick={() => setIsDrawerOpen(false)}
-        >
-          KEEP EXPLORING ↗
-        </a>
+        <a className="text-link kit-keep-exploring" href="#catalog" onClick={() => setIsDrawerOpen(false)}>KEEP EXPLORING ↗</a>
       </aside>
+
+      <div className={`modal-backdrop ${isKitBookingOpen ? "open" : ""}`} onClick={(e) => { if (e.target === e.currentTarget) setIsKitBookingOpen(false); }}>
+        {isKitBookingOpen && <div className="modal kit-booking-modal">
+          <button className="close" onClick={() => setIsKitBookingOpen(false)}>×</button>
+          <div className="eyebrow"><b /> REQUEST ACCESS // FULL KIT</div>
+          <h2>REQUEST YOUR <em>KIT.</em></h2>
+          <p className="kit-booking-summary">{kitItemCount} item{kitItemCount === 1 ? "" : "s"} across {kitItems.length} instrument{kitItems.length === 1 ? "" : "s"}. The request will be reviewed as one allocation.</p>
+          <form className="booking-form" onSubmit={handleBookingSubmit}>
+            <label>PROJECT / COURSE TITLE</label>
+            <input required placeholder="e.g. Autonomous Drone Low-Light Vision" value={projectTitle} onChange={(e) => setProjectTitle(e.target.value)} />
+            <label>PROJECT CLASSIFICATION</label>
+            <select value={projectClassification} onChange={(e) => setProjectClassification(e.target.value as typeof projectClassification)}>
+              <option value="thesis">Thesis / Senior Capstone</option><option value="research">Faculty-Sponsored Research</option><option value="course">Course Assignment Lab</option><option value="club">Student Competition Club</option><option value="hobby">Exploratory / Independent</option>
+            </select>
+            <label>PREFERRED DATE (DEADLINE)</label>
+            <input type="date" required value={preferredDate} onChange={(e) => setPreferredDate(e.target.value)} />
+            <label>TIME SLOT</label>
+            <select value={preferredSlot} onChange={(e) => setPreferredSlot(e.target.value)}><option>09:00 – 11:00</option><option>11:00 – 13:00</option><option>14:00 – 16:00</option><option>16:00 – 18:00</option></select>
+            <label>RESEARCH JUSTIFICATION / ABSTRACT</label>
+            <textarea required placeholder="Describe how this kit supports your project objectives..." value={projectReason} onChange={(e) => setProjectReason(e.target.value)} />
+            <button className="btn btn-dark" type="submit">SUBMIT KIT REQUEST ↗</button>
+          </form>
+        </div>}
+      </div>
 
       {/* PRODUCT DETAIL & ACCESS REQUEST MODAL */}
       <div
