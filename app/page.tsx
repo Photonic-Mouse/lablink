@@ -21,6 +21,7 @@ import {
   markNotificationAsRead,
 } from "@/lib/notifications";
 import { generateProjectRecommendations, EquipmentRecommendation, ProjectExtractionResult } from "@/lib/mockLLM";
+import Departments from "@/components/home/Departments";
 
 const DEPARTMENTS = [
   "All",
@@ -606,28 +607,10 @@ export default function Home() {
         </section>
 
         {/* INTRO SECTION 01 */}
-        <section className="intro section-pad">
-          <div className="eyebrow">
-            <b /> 01 — CROSS-DEPARTMENT SHARING
-          </div>
-          <div className="intro-grid">
-            <h2>
-              THE RIGHT<br />
-              TOOLS CHANGE<br />
-              <em>EVERYTHING.</em>
-            </h2>
-            <div className="intro-copy">
-              <p>
-                Break departmental silos. Whether your project requires high-speed oscilloscopes,
-                5-axis CNC machining, GPU compute clusters, or gene sequencing, LabLink matches
-                researchers to campus instruments with automated safety training checks.
-              </p>
-              <a className="circle-link" href="#catalog">
-                ↘
-              </a>
-            </div>
-          </div>
-        </section>
+        <Departments equipment={equipment} onDepartmentSelect={(department) => {
+          setActiveFilter(department);
+          document.getElementById("catalog")?.scrollIntoView({ behavior: "smooth" });
+        }} />
 
         {/* SHOWCASE SECTION 02 (CATALOGUE) */}
         <section className="showcase section-pad" id="catalog">
